@@ -65,20 +65,20 @@ enum RvInsn {
     Sb(SBTypeArgs),
     Sh(SBTypeArgs),
     Sw(SBTypeArgs),
-    Addi,
-    Slti,
-    Sltiu,
-    Xori,
-    Ori,
-    Andi,
+    Addi(ITypeArgs),
+    Slti(ITypeArgs),
+    Sltiu(ITypeArgs),
+    Xori(ITypeArgs),
+    Ori(ITypeArgs),
+    Andi(ITypeArgs),
     Slli(ShiftArgs),
     Srli(ShiftArgs),
     Srai(ShiftArgs),
     Add(RTypeArgs),
     Sub(RTypeArgs),
     Sll(RTypeArgs),
-    Slt,
-    Sltu,
+    Slt(RTypeArgs),
+    Sltu(RTypeArgs),
     Xor(RTypeArgs),
     Srl(RTypeArgs),
     Sra(RTypeArgs),
@@ -195,6 +195,15 @@ impl ISBTypeSlots {
     fn sb_funct3(&self) -> u8 {
         self.3
     }
+
+    fn rv32_shift_funct(&self) -> u8 {
+        (self.0 >> 25) as u8
+    }
+
+    fn rv64_shift_funct(&self) -> u8 {
+        (self.0 >> 26) as u8
+    }
+
 }
 
 impl From<ISBTypeSlots> for ITypeArgs {
@@ -206,6 +215,12 @@ impl From<ISBTypeSlots> for ITypeArgs {
 impl From<ISBTypeSlots> for SBTypeArgs {
     fn from(x: ISBTypeSlots) -> Self {
         Self { rs1: x.2, rs2: x.1, imm: x.0 }
+    }
+}
+
+impl From<ISBTypeSlots> for ShiftArgs {
+    fn from(x: ISBTypeSlots) -> Self {
+        Self { rd: x.3, rs1: x.1, shamt: (x.0 & 0xff) as u8 }
     }
 }
 
@@ -303,11 +318,39 @@ fn disas_riscv_insn_misc_mem(insn: u32) -> RvInsn {
 }
 
 fn disas_riscv_insn_op_imm(insn: u32) -> RvInsn {
-    todo!();
+    let s = disas_i(insn);
+    match s.i_funct3() {
+        0b000 => RvInsn::Addi(s.into()),
+        0b010 => RvInsn::Slti(s.into()),
+        0b011 => RvInsn::Sltiu(s.into()),
+        0b100 => RvInsn::Xori(s.into()),
+        0b110 => RvInsn::Ori(s.into()),
+        0b111 => RvInsn::Andi(s.into()),
+
+        0b001 | 0b101 => {
+            match (s.rv64_shift_funct(), s.i_funct3()) {
+                (0b000000, 0b001) => RvInsn::Slli(s.into()),
+                (0b000000, 0b101) => RvInsn::Srli(s.into()),
+                (0b010000, 0b101) => RvInsn::Srai(s.into()),
+                _ => RvInsn::Invalid(insn),
+            }
+        }
+
+        _ => RvInsn::Invalid(insn),
+    }
 }
 
 fn disas_riscv_insn_op_imm_32(insn: u32) -> RvInsn {
-    todo!();
+    let s = disas_i(insn);
+    match (s.rv32_shift_funct(), s.i_funct3()) {
+        (_, 0b000) => RvInsn::Addiw(s.into()),
+        (0b0000000, 0b001) => RvInsn::Slliw(s.into()),
+        (0b0000000, 0b101) => RvInsn::Srliw(s.into()),
+        (0b0100000, 0b101) => RvInsn::Sraiw(s.into()),
+
+        _ => RvInsn::Invalid(insn),
+    }
+
 }
 
 fn disas_riscv_insn_store(insn: u32) -> RvInsn {
@@ -332,11 +375,49 @@ fn disas_riscv_insn_amo(insn: u32) -> RvInsn {
 }
 
 fn disas_riscv_insn_op(insn: u32) -> RvInsn {
-    todo!();
+    let s = disas_r(insn);
+    match (s.funct7(), s.funct3()) {
+        (0b0000000, 0b000) => RvInsn::Add(s.into()),
+        (0b0100000, 0b000) => RvInsn::Sub(s.into()),
+        (0b0000000, 0b001) => RvInsn::Sll(s.into()),
+        (0b0000000, 0b010) => RvInsn::Slt(s.into()),
+        (0b0000000, 0b011) => RvInsn::Sltu(s.into()),
+        (0b0000000, 0b100) => RvInsn::Xor(s.into()),
+        (0b0000000, 0b101) => RvInsn::Srl(s.into()),
+        (0b0100000, 0b101) => RvInsn::Sra(s.into()),
+        (0b0000000, 0b110) => RvInsn::Or(s.into()),
+        (0b0000000, 0b111) => RvInsn::And(s.into()),
+
+        (0b0000001, 0b000) => RvInsn::Mul(s.into()),
+        (0b0000001, 0b001) => RvInsn::Mulh(s.into()),
+        (0b0000001, 0b010) => RvInsn::Mulhsu(s.into()),
+        (0b0000001, 0b011) => RvInsn::Mulhu(s.into()),
+        (0b0000001, 0b100) => RvInsn::Div(s.into()),
+        (0b0000001, 0b101) => RvInsn::Divu(s.into()),
+        (0b0000001, 0b110) => RvInsn::Rem(s.into()),
+        (0b0000001, 0b111) => RvInsn::Remu(s.into()),
+
+        _ => RvInsn::Invalid(insn),
+    }
 }
 
 fn disas_riscv_insn_op_32(insn: u32) -> RvInsn {
-    todo!();
+    let s = disas_r(insn);
+    match (s.funct7(), s.funct3()) {
+        (0b0000000, 0b000) => RvInsn::Addw(s.into()),
+        (0b0100000, 0b000) => RvInsn::Subw(s.into()),
+        (0b0000000, 0b001) => RvInsn::Sllw(s.into()),
+        (0b0000000, 0b101) => RvInsn::Srlw(s.into()),
+        (0b0100000, 0b101) => RvInsn::Sraw(s.into()),
+
+        (0b0000001, 0b000) => RvInsn::Mulw(s.into()),
+        (0b0000001, 0b100) => RvInsn::Divw(s.into()),
+        (0b0000001, 0b101) => RvInsn::Divuw(s.into()),
+        (0b0000001, 0b110) => RvInsn::Remw(s.into()),
+        (0b0000001, 0b111) => RvInsn::Remuw(s.into()),
+
+        _ => RvInsn::Invalid(insn),
+    }
 }
 
 fn disas_riscv_insn_madd(insn: u32) -> RvInsn {
