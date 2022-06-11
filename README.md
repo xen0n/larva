@@ -1,4 +1,4 @@
-# LARVa - Bridge LoongArch to RISC-V
+# LARVa - Bridging LoongArch to RISC-V
 
 This project is a proof-of-concept RISC-V emulator aiming at near-native
 execution performance, currently targeting the LoongArch but may expand to
@@ -15,6 +15,11 @@ chart at all, I do hope to manage the difficulty *here* somehow!
 
 ## Roadmap
 
+* [x] RV64GC disassembly
+* [ ] verification interpreter
+* [ ] LoongArch assembly
 * [ ] linux-user emulation
+    * [ ] translation pass
+    * [ ] basic JIT machinery
 * [ ] system level PoC
     - TODO
