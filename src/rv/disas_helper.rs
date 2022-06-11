@@ -82,6 +82,18 @@ impl ISBTypeSlots {
     pub(super) fn rv64_shift_funct(&self) -> u8 {
         (self.0 >> 26) as u8
     }
+
+    pub(super) fn fence_fm(&self) -> u8 {
+        (self.0 >> 8) as u8
+    }
+
+    pub(super) fn fence_pred(&self) -> FenceSet {
+        (((self.0 >> 4) & 0b1111) as u8).into()
+    }
+
+    pub(super) fn fence_succ(&self) -> FenceSet {
+        ((self.0 & 0b1111) as u8).into()
+    }
 }
 
 impl From<ISBTypeSlots> for ITypeArgs {
@@ -110,6 +122,16 @@ impl From<ISBTypeSlots> for ShiftArgs {
             rd: x.3,
             rs1: x.1,
             shamt: (x.0 & 0xff) as u8,
+        }
+    }
+}
+
+impl From<ISBTypeSlots> for FenceArgs {
+    fn from(x: ISBTypeSlots) -> Self {
+        Self {
+            fm: x.fence_fm(),
+            pred: x.fence_pred(),
+            succ: x.fence_succ(),
         }
     }
 }

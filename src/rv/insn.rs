@@ -48,7 +48,7 @@ pub enum RvInsn {
     Sra(RTypeArgs),
     Or(RTypeArgs),
     And(RTypeArgs),
-    Fence,
+    Fence(FenceArgs),
 
     // Zifencei
     FenceI(ITypeArgs),
@@ -162,6 +162,7 @@ fn disas_riscv_insn_load_fp(insn: u32) -> RvInsn {
 fn disas_riscv_insn_misc_mem(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
+        0b000 => RvInsn::Fence(s.into()),
         0b001 => RvInsn::FenceI(s.into()),
         _ => RvInsn::Invalid(insn),
     }
