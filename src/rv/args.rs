@@ -78,3 +78,46 @@ pub struct FenceArgs {
     pub pred: FenceSet,
     pub succ: FenceSet,
 }
+
+#[derive(Debug)]
+pub enum RoundingMode {
+    Rne,
+    Rtz,
+    Rdn,
+    Rup,
+    Rmm,
+    Dyn,
+    Reserved(u8),
+}
+
+impl From<u8> for RoundingMode {
+    fn from(x: u8) -> Self {
+        match x {
+            0b000 => Self::Rne,
+            0b001 => Self::Rtz,
+            0b010 => Self::Rdn,
+            0b011 => Self::Rup,
+            0b100 => Self::Rmm,
+            0b111 => Self::Dyn,
+            _ => Self::Reserved(x),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct R4TypeArgs {
+    pub rm: RoundingMode,
+    pub rd: u8,
+    pub rs1: u8,
+    pub rs2: u8,
+    pub rs3: u8,
+}
+
+// variant of RTypeArgs
+#[derive(Debug)]
+pub struct RFTypeArgs {
+    pub rm: RoundingMode,
+    pub rd: u8,
+    pub rs1: u8,
+    pub rs2: u8,
+}

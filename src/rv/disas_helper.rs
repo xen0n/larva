@@ -62,6 +62,17 @@ impl From<RTypeSlots> for AmoLrArgs {
     }
 }
 
+impl From<RTypeSlots> for RFTypeArgs {
+    fn from(x: RTypeSlots) -> Self {
+        Self {
+            rm: x.funct3().into(),
+            rd: x.4,
+            rs1: x.2,
+            rs2: x.1,
+        }
+    }
+}
+
 // I-type: imm, rs1, funct3, rd
 // S-type & B-type: imm, rs2, rs1, funct3
 pub(super) struct ISBTypeSlots(i32, u8, u8, u8);
@@ -145,6 +156,27 @@ impl From<UJTypeSlots> for UJTypeArgs {
     }
 }
 
+// rs3, funct2, rs2, rs1, funct3, rd
+pub(super) struct R4TypeSlots(u8, u8, u8, u8, u8, u8);
+
+impl R4TypeSlots {
+    pub(super) fn funct2(&self) -> u8 {
+        self.1
+    }
+}
+
+impl From<R4TypeSlots> for R4TypeArgs {
+    fn from(x: R4TypeSlots) -> Self {
+        Self {
+            rm: x.4.into(),
+            rd: x.5,
+            rs1: x.3,
+            rs2: x.2,
+            rs3: x.0,
+        }
+    }
+}
+
 fn simm_from_uimm(uimm: u32, width: u8) -> i32 {
     // example with width = 6, uimm = 0b100111:
     //
@@ -218,4 +250,14 @@ pub(super) fn disas_j(insn: u32) -> UJTypeSlots {
     let imm = simm_from_uimm(imm, 21);
     let rd = ((insn >> 7) & 0b11111) as u8;
     UJTypeSlots(imm, rd)
+}
+
+pub(super) fn disas_r4(insn: u32) -> R4TypeSlots {
+    let rs3 = (insn >> 27) as u8;
+    let funct2 = ((insn >> 25) & 0b11) as u8;
+    let rs2 = ((insn >> 20) & 0b11111) as u8;
+    let rs1 = ((insn >> 15) & 0b11111) as u8;
+    let funct3 = ((insn >> 12) & 0b111) as u8;
+    let rd = ((insn >> 7) & 0b11111) as u8;
+    R4TypeSlots(rs3, funct2, rs2, rs1, funct3, rd)
 }
