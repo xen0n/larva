@@ -83,6 +83,32 @@ pub enum RvInsn {
     Divuw(RTypeArgs),
     Remw(RTypeArgs),
     Remuw(RTypeArgs),
+
+    // RV32A
+    LrW(AmoLrArgs),
+    ScW(AmoArgs),
+    AmoSwapW(AmoArgs),
+    AmoAddW(AmoArgs),
+    AmoXorW(AmoArgs),
+    AmoAndW(AmoArgs),
+    AmoOrW(AmoArgs),
+    AmoMinW(AmoArgs),
+    AmoMaxW(AmoArgs),
+    AmoMinuW(AmoArgs),
+    AmoMaxuW(AmoArgs),
+
+    // RV64A
+    LrD(AmoLrArgs),
+    ScD(AmoArgs),
+    AmoSwapD(AmoArgs),
+    AmoAddD(AmoArgs),
+    AmoXorD(AmoArgs),
+    AmoAndD(AmoArgs),
+    AmoOrD(AmoArgs),
+    AmoMinD(AmoArgs),
+    AmoMaxD(AmoArgs),
+    AmoMinuD(AmoArgs),
+    AmoMaxuD(AmoArgs),
 }
 
 pub fn disas_riscv_insn_32bit(insn: u32) -> RvInsn {
@@ -188,7 +214,46 @@ fn disas_riscv_insn_store_fp(insn: u32) -> RvInsn {
 }
 
 fn disas_riscv_insn_amo(insn: u32) -> RvInsn {
-    todo!();
+    let s = disas_r(insn);
+    match (s.funct3(), s.amo_funct()) {
+        (0b010, 0b00010) => {
+            if s.rs2() == 0 {
+                RvInsn::LrW(s.into())
+            } else {
+                RvInsn::Invalid(insn)
+            }
+        }
+        (0b010, 0b00011) => RvInsn::ScW(s.into()),
+        (0b010, 0b00001) => RvInsn::AmoSwapW(s.into()),
+        (0b010, 0b00000) => RvInsn::AmoAddW(s.into()),
+        (0b010, 0b00100) => RvInsn::AmoXorW(s.into()),
+        (0b010, 0b01100) => RvInsn::AmoAndW(s.into()),
+        (0b010, 0b01000) => RvInsn::AmoOrW(s.into()),
+        (0b010, 0b10000) => RvInsn::AmoMinW(s.into()),
+        (0b010, 0b10100) => RvInsn::AmoMaxW(s.into()),
+        (0b010, 0b11000) => RvInsn::AmoMinuW(s.into()),
+        (0b010, 0b11100) => RvInsn::AmoMaxuW(s.into()),
+
+        (0b011, 0b00010) => {
+            if s.rs2() == 0 {
+                RvInsn::LrD(s.into())
+            } else {
+                RvInsn::Invalid(insn)
+            }
+        }
+        (0b011, 0b00011) => RvInsn::ScD(s.into()),
+        (0b011, 0b00001) => RvInsn::AmoSwapD(s.into()),
+        (0b011, 0b00000) => RvInsn::AmoAddD(s.into()),
+        (0b011, 0b00100) => RvInsn::AmoXorD(s.into()),
+        (0b011, 0b01100) => RvInsn::AmoAndD(s.into()),
+        (0b011, 0b01000) => RvInsn::AmoOrD(s.into()),
+        (0b011, 0b10000) => RvInsn::AmoMinD(s.into()),
+        (0b011, 0b10100) => RvInsn::AmoMaxD(s.into()),
+        (0b011, 0b11000) => RvInsn::AmoMinuD(s.into()),
+        (0b011, 0b11100) => RvInsn::AmoMaxuD(s.into()),
+
+        _ => RvInsn::Invalid(insn),
+    }
 }
 
 fn disas_riscv_insn_op(insn: u32) -> RvInsn {

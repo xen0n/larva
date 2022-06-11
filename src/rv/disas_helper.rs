@@ -11,6 +11,22 @@ impl RTypeSlots {
     pub(super) fn funct3(&self) -> u8 {
         self.3
     }
+
+    pub(super) fn rs2(&self) -> u8 {
+        self.1
+    }
+
+    pub(super) fn amo_funct(&self) -> u8 {
+        self.funct7() >> 2
+    }
+
+    pub(super) fn amo_aq(&self) -> bool {
+        self.funct7() & 0b10 != 0
+    }
+
+    pub(super) fn amo_rl(&self) -> bool {
+        self.funct7() & 0b01 != 0
+    }
 }
 
 impl From<RTypeSlots> for RTypeArgs {
@@ -19,6 +35,29 @@ impl From<RTypeSlots> for RTypeArgs {
             rd: x.4,
             rs1: x.2,
             rs2: x.1,
+        }
+    }
+}
+
+impl From<RTypeSlots> for AmoArgs {
+    fn from(x: RTypeSlots) -> Self {
+        Self {
+            aq: x.amo_aq(),
+            rl: x.amo_rl(),
+            rd: x.4,
+            rs1: x.2,
+            rs2: x.1,
+        }
+    }
+}
+
+impl From<RTypeSlots> for AmoLrArgs {
+    fn from(x: RTypeSlots) -> Self {
+        Self {
+            aq: x.amo_aq(),
+            rl: x.amo_rl(),
+            rd: x.4,
+            rs1: x.2,
         }
     }
 }
