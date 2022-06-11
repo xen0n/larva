@@ -4,7 +4,7 @@ fn main() {
     macro_rules! d {
         ($x: expr) => {
             println!("{:?}", rv::disas_riscv_insn_32bit($x));
-        }
+        };
     }
 
     d!(0x000fc397);

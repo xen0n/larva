@@ -147,14 +147,12 @@ fn disas_riscv_insn_op_imm(insn: u32) -> RvInsn {
         0b110 => RvInsn::Ori(s.into()),
         0b111 => RvInsn::Andi(s.into()),
 
-        0b001 | 0b101 => {
-            match (s.rv64_shift_funct(), s.i_funct3()) {
-                (0b000000, 0b001) => RvInsn::Slli(s.into()),
-                (0b000000, 0b101) => RvInsn::Srli(s.into()),
-                (0b010000, 0b101) => RvInsn::Srai(s.into()),
-                _ => RvInsn::Invalid(insn),
-            }
-        }
+        0b001 | 0b101 => match (s.rv64_shift_funct(), s.i_funct3()) {
+            (0b000000, 0b001) => RvInsn::Slli(s.into()),
+            (0b000000, 0b101) => RvInsn::Srli(s.into()),
+            (0b010000, 0b101) => RvInsn::Srai(s.into()),
+            _ => RvInsn::Invalid(insn),
+        },
 
         _ => RvInsn::Invalid(insn),
     }
@@ -170,7 +168,6 @@ fn disas_riscv_insn_op_imm_32(insn: u32) -> RvInsn {
 
         _ => RvInsn::Invalid(insn),
     }
-
 }
 
 fn disas_riscv_insn_store(insn: u32) -> RvInsn {

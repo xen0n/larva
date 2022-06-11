@@ -3,4 +3,4 @@ mod disas_helper;
 mod insn;
 
 pub use args::*;
-pub use insn::{RvInsn, disas_riscv_insn_32bit};
+pub use insn::{disas_riscv_insn_32bit, RvInsn};

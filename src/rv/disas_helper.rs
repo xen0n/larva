@@ -15,7 +15,11 @@ impl RTypeSlots {
 
 impl From<RTypeSlots> for RTypeArgs {
     fn from(x: RTypeSlots) -> Self {
-        Self { rd: x.4, rs1: x.2, rs2: x.1 }
+        Self {
+            rd: x.4,
+            rs1: x.2,
+            rs2: x.1,
+        }
     }
 }
 
@@ -39,24 +43,35 @@ impl ISBTypeSlots {
     pub(super) fn rv64_shift_funct(&self) -> u8 {
         (self.0 >> 26) as u8
     }
-
 }
 
 impl From<ISBTypeSlots> for ITypeArgs {
     fn from(x: ISBTypeSlots) -> Self {
-        Self { rd: x.3, rs1: x.1, imm: x.0 }
+        Self {
+            rd: x.3,
+            rs1: x.1,
+            imm: x.0,
+        }
     }
 }
 
 impl From<ISBTypeSlots> for SBTypeArgs {
     fn from(x: ISBTypeSlots) -> Self {
-        Self { rs1: x.2, rs2: x.1, imm: x.0 }
+        Self {
+            rs1: x.2,
+            rs2: x.1,
+            imm: x.0,
+        }
     }
 }
 
 impl From<ISBTypeSlots> for ShiftArgs {
     fn from(x: ISBTypeSlots) -> Self {
-        Self { rd: x.3, rs1: x.1, shamt: (x.0 & 0xff) as u8 }
+        Self {
+            rd: x.3,
+            rs1: x.1,
+            shamt: (x.0 & 0xff) as u8,
+        }
     }
 }
 
