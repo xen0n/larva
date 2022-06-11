@@ -121,28 +121,28 @@ pub enum RvInsn {
     FsubS(RFTypeArgs),
     FmulS(RFTypeArgs),
     FdivS(RFTypeArgs),
-    FsqrtS,
+    FsqrtS(R2FTypeArgs),
     FsgnjS(RTypeArgs),
     FsgnjnS(RTypeArgs),
     FsgnjxS(RTypeArgs),
     FminS(RTypeArgs),
     FmaxS(RTypeArgs),
-    FcvtWS,
-    FcvtWuS,
-    FmvXW,
+    FcvtWS(R2FTypeArgs),
+    FcvtWuS(R2FTypeArgs),
+    FmvXW(R2TypeArgs),
     FeqS(RTypeArgs),
     FltS(RTypeArgs),
     FleS(RTypeArgs),
-    FclassS,
-    FcvtSW,
-    FcvtSWu,
-    FmvWX,
+    FclassS(R2TypeArgs),
+    FcvtSW(R2FTypeArgs),
+    FcvtSWu(R2FTypeArgs),
+    FmvWX(R2TypeArgs),
 
     // RV64F
-    FcvtLS,
-    FcvtLuS,
-    FcvtSL,
-    FcvtSLu,
+    FcvtLS(R2FTypeArgs),
+    FcvtLuS(R2FTypeArgs),
+    FcvtSL(R2FTypeArgs),
+    FcvtSLu(R2FTypeArgs),
 }
 
 pub fn disas_riscv_insn_32bit(insn: u32) -> RvInsn {
@@ -383,19 +383,35 @@ fn disas_riscv_insn_nmadd(insn: u32) -> RvInsn {
 
 fn disas_riscv_insn_op_fp(insn: u32) -> RvInsn {
     let s = disas_r(insn);
-    match (s.funct7(), s.funct3()) {
-        (0b0000000, _) => RvInsn::FaddS(s.into()),
-        (0b0000100, _) => RvInsn::FsubS(s.into()),
-        (0b0001000, _) => RvInsn::FmulS(s.into()),
-        (0b0001100, _) => RvInsn::FdivS(s.into()),
-        (0b0010000, 0b000) => RvInsn::FsgnjS(s.into()),
-        (0b0010000, 0b001) => RvInsn::FsgnjnS(s.into()),
-        (0b0010000, 0b010) => RvInsn::FsgnjxS(s.into()),
-        (0b0010100, 0b000) => RvInsn::FminS(s.into()),
-        (0b0010100, 0b001) => RvInsn::FmaxS(s.into()),
-        (0b1010000, 0b010) => RvInsn::FeqS(s.into()),
-        (0b1010000, 0b001) => RvInsn::FltS(s.into()),
-        (0b1010000, 0b000) => RvInsn::FleS(s.into()),
+    match (s.funct7(), s.rs2(), s.funct3()) {
+        // RV32F
+        (0b0000000, _, _) => RvInsn::FaddS(s.into()),
+        (0b0000100, _, _) => RvInsn::FsubS(s.into()),
+        (0b0001000, _, _) => RvInsn::FmulS(s.into()),
+        (0b0001100, _, _) => RvInsn::FdivS(s.into()),
+        (0b0101100, 0b00000, _) => RvInsn::FsqrtS(s.into()),
+        (0b0010000, _, 0b000) => RvInsn::FsgnjS(s.into()),
+        (0b0010000, _, 0b001) => RvInsn::FsgnjnS(s.into()),
+        (0b0010000, _, 0b010) => RvInsn::FsgnjxS(s.into()),
+        (0b0010100, _, 0b000) => RvInsn::FminS(s.into()),
+        (0b0010100, _, 0b001) => RvInsn::FmaxS(s.into()),
+        (0b1100000, 0b00000, _) => RvInsn::FcvtWS(s.into()),
+        (0b1100000, 0b00001, _) => RvInsn::FcvtWuS(s.into()),
+        (0b1110000, 0b00000, 0b000) => RvInsn::FmvXW(s.into()),
+        (0b1010000, _, 0b010) => RvInsn::FeqS(s.into()),
+        (0b1010000, _, 0b001) => RvInsn::FltS(s.into()),
+        (0b1010000, _, 0b000) => RvInsn::FleS(s.into()),
+        (0b1110000, 0b00000, 0b001) => RvInsn::FclassS(s.into()),
+        (0b1101000, 0b00000, _) => RvInsn::FcvtSW(s.into()),
+        (0b1101000, 0b00001, _) => RvInsn::FcvtSWu(s.into()),
+        (0b1111000, 0b00000, 0b000) => RvInsn::FmvWX(s.into()),
+
+        // RV64F
+        (0b1100000, 0b00010, _) => RvInsn::FcvtLS(s.into()),
+        (0b1100000, 0b00011, _) => RvInsn::FcvtLuS(s.into()),
+        (0b1101000, 0b00010, _) => RvInsn::FcvtSL(s.into()),
+        (0b1101000, 0b00011, _) => RvInsn::FcvtSLu(s.into()),
+
         _ => RvInsn::Invalid(insn),
     }
 }

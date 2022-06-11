@@ -73,6 +73,22 @@ impl From<RTypeSlots> for RFTypeArgs {
     }
 }
 
+impl From<RTypeSlots> for R2TypeArgs {
+    fn from(x: RTypeSlots) -> Self {
+        Self { rd: x.4, rs1: x.2 }
+    }
+}
+
+impl From<RTypeSlots> for R2FTypeArgs {
+    fn from(x: RTypeSlots) -> Self {
+        Self {
+            rm: x.funct3().into(),
+            rd: x.4,
+            rs1: x.2,
+        }
+    }
+}
+
 // I-type: imm, rs1, funct3, rd
 // S-type & B-type: imm, rs2, rs1, funct3
 pub(super) struct ISBTypeSlots(i32, u8, u8, u8);
