@@ -143,6 +143,42 @@ pub enum RvInsn {
     FcvtLuS(R2FTypeArgs),
     FcvtSL(R2FTypeArgs),
     FcvtSLu(R2FTypeArgs),
+
+    // RV32D
+    Fld(ITypeArgs),
+    Fsd(SBTypeArgs),
+    FmaddD(R4TypeArgs),
+    FmsubD(R4TypeArgs),
+    FnmsubD(R4TypeArgs),
+    FnmaddD(R4TypeArgs),
+    FaddD(RFTypeArgs),
+    FsubD(RFTypeArgs),
+    FmulD(RFTypeArgs),
+    FdivD(RFTypeArgs),
+    FsqrtD(R2FTypeArgs),
+    FsgnjD(RTypeArgs),
+    FsgnjnD(RTypeArgs),
+    FsgnjxD(RTypeArgs),
+    FminD(RTypeArgs),
+    FmaxD(RTypeArgs),
+    FcvtSD(R2FTypeArgs),
+    FcvtDS(R2FTypeArgs),
+    FeqD(RTypeArgs),
+    FltD(RTypeArgs),
+    FleD(RTypeArgs),
+    FclassD(R2TypeArgs),
+    FcvtWD(R2FTypeArgs),
+    FcvtWuD(R2FTypeArgs),
+    FcvtDW(R2FTypeArgs),
+    FcvtDWu(R2FTypeArgs),
+
+    // RV64D
+    FcvtLD(R2FTypeArgs),
+    FcvtLuD(R2FTypeArgs),
+    FmvXD(R2TypeArgs),
+    FcvtDL(R2FTypeArgs),
+    FcvtDLu(R2FTypeArgs),
+    FmvDX(R2TypeArgs),
 }
 
 pub fn disas_riscv_insn_32bit(insn: u32) -> RvInsn {
@@ -193,6 +229,7 @@ fn disas_riscv_insn_load_fp(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b010 => RvInsn::Flw(s.into()),
+        0b011 => RvInsn::Fld(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -256,6 +293,7 @@ fn disas_riscv_insn_store_fp(insn: u32) -> RvInsn {
     let s = disas_s(insn);
     match s.sb_funct3() {
         0b010 => RvInsn::Fsw(s.into()),
+        0b011 => RvInsn::Fsd(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -353,6 +391,7 @@ fn disas_riscv_insn_madd(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FmaddS(s.into()),
+        0b01 => RvInsn::FmaddD(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -361,6 +400,7 @@ fn disas_riscv_insn_msub(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FmsubS(s.into()),
+        0b01 => RvInsn::FmsubD(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -369,6 +409,7 @@ fn disas_riscv_insn_nmsub(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FnmsubS(s.into()),
+        0b01 => RvInsn::FnmsubD(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -377,6 +418,7 @@ fn disas_riscv_insn_nmadd(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FnmaddS(s.into()),
+        0b01 => RvInsn::FnmaddD(s.into()),
         _ => RvInsn::Invalid(insn),
     }
 }
@@ -411,6 +453,36 @@ fn disas_riscv_insn_op_fp(insn: u32) -> RvInsn {
         (0b1100000, 0b00011, _) => RvInsn::FcvtLuS(s.into()),
         (0b1101000, 0b00010, _) => RvInsn::FcvtSL(s.into()),
         (0b1101000, 0b00011, _) => RvInsn::FcvtSLu(s.into()),
+
+        // RV32D
+        (0b0000001, _, _) => RvInsn::FaddD(s.into()),
+        (0b0000101, _, _) => RvInsn::FsubD(s.into()),
+        (0b0001001, _, _) => RvInsn::FmulD(s.into()),
+        (0b0001101, _, _) => RvInsn::FdivD(s.into()),
+        (0b0101101, 0b00000, _) => RvInsn::FsqrtD(s.into()),
+        (0b0010001, _, 0b000) => RvInsn::FsgnjD(s.into()),
+        (0b0010001, _, 0b001) => RvInsn::FsgnjnD(s.into()),
+        (0b0010001, _, 0b010) => RvInsn::FsgnjxD(s.into()),
+        (0b0010101, _, 0b000) => RvInsn::FminD(s.into()),
+        (0b0010101, _, 0b001) => RvInsn::FmaxD(s.into()),
+        (0b0100000, 0b00001, _) => RvInsn::FcvtSD(s.into()),
+        (0b0100001, 0b00000, _) => RvInsn::FcvtDS(s.into()),
+        (0b1010001, _, 0b010) => RvInsn::FeqD(s.into()),
+        (0b1010001, _, 0b001) => RvInsn::FltD(s.into()),
+        (0b1010001, _, 0b000) => RvInsn::FleD(s.into()),
+        (0b1110001, 0b00000, 0b001) => RvInsn::FclassD(s.into()),
+        (0b1100001, 0b00000, _) => RvInsn::FcvtWD(s.into()),
+        (0b1100001, 0b00001, _) => RvInsn::FcvtWuD(s.into()),
+        (0b1101001, 0b00000, _) => RvInsn::FcvtDW(s.into()),
+        (0b1101001, 0b00001, _) => RvInsn::FcvtDWu(s.into()),
+
+        // RV64D
+        (0b1100001, 0b00010, _) => RvInsn::FcvtLD(s.into()),
+        (0b1100001, 0b00011, _) => RvInsn::FcvtLuD(s.into()),
+        (0b1110001, 0b00000, 0b000) => RvInsn::FmvXD(s.into()),
+        (0b1101001, 0b00010, _) => RvInsn::FcvtDL(s.into()),
+        (0b1101001, 0b00011, _) => RvInsn::FcvtDLu(s.into()),
+        (0b1111001, 0b00000, 0b000) => RvInsn::FmvDX(s.into()),
 
         _ => RvInsn::Invalid(insn),
     }
