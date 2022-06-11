@@ -4,4 +4,4 @@ mod insn;
 mod rvc;
 
 pub use args::*;
-pub use insn::{disas_32bit, RvInsn};
+pub use insn::{RvDecoder, RvInsn};

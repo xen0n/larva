@@ -1,5 +1,6 @@
 use super::args::*;
 use super::disas_helper::*;
+use super::rvc::RvCDecoder;
 
 #[derive(Debug)]
 pub enum RvInsn {
@@ -181,7 +182,44 @@ pub enum RvInsn {
     FmvDX(R2TypeArgs),
 }
 
-pub fn disas_32bit(insn: u32) -> RvInsn {
+pub struct RvDecoder {
+    rvc: RvCDecoder,
+}
+
+impl RvDecoder {
+    pub fn new(xlen: usize) -> Self {
+        Self {
+            rvc: RvCDecoder::new(xlen),
+        }
+    }
+
+    /// Decodes one RV instruction. Returns the decoded instruction and the
+    /// instruction length in bytes.
+    pub fn disas(&self, mem: &[u8]) -> Option<(RvInsn, usize)> {
+        let quadrant = mem[0] & 0b11;
+        if quadrant != 0b11 {
+            // RVC insn.
+            if mem.len() < 2 {
+                None
+            } else {
+                let insn = (mem[1] as u16) << 8 | (mem[0] as u16);
+                Some((self.rvc.disas(insn).into(), 2))
+            }
+        } else {
+            if mem.len() < 4 {
+                None
+            } else {
+                let insn = (mem[3] as u32) << 24
+                    | (mem[2] as u32) << 16
+                    | (mem[1] as u32) << 8
+                    | (mem[0] as u32);
+                Some((disas_32bit(insn), 4))
+            }
+        }
+    }
+}
+
+fn disas_32bit(insn: u32) -> RvInsn {
     let opcode = (insn >> 2) & 0b11111;
     match opcode {
         0b00_000 => disas_load(insn),

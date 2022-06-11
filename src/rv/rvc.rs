@@ -1,5 +1,8 @@
+use super::ITypeArgs;
+use super::RvInsn;
+
 #[derive(PartialEq, Debug)]
-enum RvCInsn {
+pub(super) enum RvCInsn {
     Invalid(u16),
     Addi4spn { rd: u8, imm: u16 },
     Fld { rd: u8, rs1: u8, imm: u16 },
@@ -35,6 +38,40 @@ enum RvCInsn {
     Sdsp,
 }
 
+impl From<RvCInsn> for RvInsn {
+    fn from(insn: RvCInsn) -> Self {
+        match insn {
+            RvCInsn::Invalid(x) => Self::Invalid(x as u32),
+            RvCInsn::Addi4spn { rd, imm } => Self::Addi(ITypeArgs {
+                rd,
+                rs1: 2,
+                imm: imm as i32,
+            }),
+            RvCInsn::Fld { rd, rs1, imm } => Self::Fld(ITypeArgs {
+                rd,
+                rs1,
+                imm: imm as i32,
+            }),
+            RvCInsn::Lw { rd, rs1, imm } => Self::Lw(ITypeArgs {
+                rd,
+                rs1,
+                imm: imm as i32,
+            }),
+            RvCInsn::Flw { rd, rs1, imm } => Self::Flw(ITypeArgs {
+                rd,
+                rs1,
+                imm: imm as i32,
+            }),
+            RvCInsn::Ld { rd, rs1, imm } => Self::Ld(ITypeArgs {
+                rd,
+                rs1,
+                imm: imm as i32,
+            }),
+            _ => todo!(),
+        }
+    }
+}
+
 // Compressed register slot.
 struct CReg(u8);
 
@@ -44,16 +81,16 @@ impl From<CReg> for u8 {
     }
 }
 
-struct RvCDecoder {
+pub(super) struct RvCDecoder {
     xlen: usize,
 }
 
 impl RvCDecoder {
-    fn new(xlen: usize) -> Self {
+    pub(super) fn new(xlen: usize) -> Self {
         Self { xlen }
     }
 
-    fn disas(&self, insn: u16) -> RvCInsn {
+    pub(super) fn disas(&self, insn: u16) -> RvCInsn {
         match insn & 0b11 {
             0b00 => self.disas_00(insn),
             0b01 => self.disas_01(insn),
