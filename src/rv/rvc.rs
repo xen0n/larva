@@ -31,19 +31,20 @@ pub(super) enum RvCInsn {
     J { imm: i32 },
     Beqz { rs1: u8, imm: i32 },
     Bnez { rs1: u8, imm: i32 },
-    Slli,
-    Fldsp,
-    Lwsp,
-    Flwsp,
-    Ldsp,
-    Jr,
-    Jalr,
-    Mv,
-    Add,
-    Fsdsp,
-    Swsp,
-    Fswsp,
-    Sdsp,
+    Slli { rd: u8, imm: u8 },
+    Fldsp { rd: u8, imm: i32 },
+    Lwsp { rd: u8, imm: i32 },
+    Flwsp { rd: u8, imm: i32 },
+    Ldsp { rd: u8, imm: i32 },
+    Jr { rs1: u8 },
+    Ebreak,
+    Jalr { rs1: u8 },
+    Mv { rd: u8, rs2: u8 },
+    Add { rd: u8, rs2: u8 },
+    Fsdsp { rs2: u8, imm: i32 },
+    Swsp { rs2: u8, imm: i32 },
+    Fswsp { rs2: u8, imm: i32 },
+    Sdsp { rs2: u8, imm: i32 },
 }
 
 impl From<RvCInsn> for RvInsn {
@@ -85,7 +86,24 @@ impl From<RvCInsn> for RvInsn {
             RvCInsn::J { imm } => Self::Jal(UJTypeArgs { rd: 0, imm }),
             RvCInsn::Beqz { rs1, imm } => Self::Beq(SBTypeArgs { rs1, rs2: 0, imm }),
             RvCInsn::Bnez { rs1, imm } => Self::Bne(SBTypeArgs { rs1, rs2: 0, imm }),
-            _ => todo!(),
+            RvCInsn::Slli { rd, imm } => Self::Slli(ShiftArgs {
+                rd,
+                rs1: rd,
+                shamt: imm,
+            }),
+            RvCInsn::Fldsp { rd, imm } => Self::Fld(ITypeArgs { rd, rs1: 2, imm }),
+            RvCInsn::Lwsp { rd, imm } => Self::Lw(ITypeArgs { rd, rs1: 2, imm }),
+            RvCInsn::Flwsp { rd, imm } => Self::Flw(ITypeArgs { rd, rs1: 2, imm }),
+            RvCInsn::Ldsp { rd, imm } => Self::Ld(ITypeArgs { rd, rs1: 2, imm }),
+            RvCInsn::Jr { rs1 } => Self::Jalr(ITypeArgs { rd: 0, rs1, imm: 0 }),
+            RvCInsn::Ebreak => Self::Ebreak,
+            RvCInsn::Jalr { rs1 } => Self::Jalr(ITypeArgs { rd: 1, rs1, imm: 0 }),
+            RvCInsn::Mv { rd, rs2 } => Self::Add(RTypeArgs { rd, rs1: 0, rs2 }),
+            RvCInsn::Add { rd, rs2 } => Self::Add(RTypeArgs { rd, rs1: rd, rs2 }),
+            RvCInsn::Fsdsp { rs2, imm } => Self::Fsd(SBTypeArgs { rs1: 2, rs2, imm }),
+            RvCInsn::Swsp { rs2, imm } => Self::Sw(SBTypeArgs { rs1: 2, rs2, imm }),
+            RvCInsn::Fswsp { rs2, imm } => Self::Fsw(SBTypeArgs { rs1: 2, rs2, imm }),
+            RvCInsn::Sdsp { rs2, imm } => Self::Sd(SBTypeArgs { rs1: 2, rs2, imm }),
         }
     }
 }
@@ -316,8 +334,86 @@ impl RvCDecoder {
         }
     }
 
-    fn disas_10(&self, _: u16) -> RvCInsn {
-        todo!();
+    fn disas_10(&self, insn: u16) -> RvCInsn {
+        let b15_13 = insn >> 13; // insn[15:13]
+        let b12 = (insn >> 12) & 0b1; // insn[12]
+
+        // these are full slots, unlike the other quadrants
+        let rd = ((insn >> 7) & 0b11111) as u8;
+        let rs2 = ((insn >> 2) & 0b11111) as u8;
+
+        let uimm5_40 = (b12 as u8) << 5 | rs2;
+        let uimm5_43_86 = {
+            let a = b12;
+            let b = (insn >> 5) & 0b11;
+            let c = (insn >> 2) & 0b111;
+            a << 5 | b << 3 | c << 6
+        };
+        let uimm5_42_76 = {
+            let a = b12;
+            let b = (insn >> 4) & 0b111;
+            let c = (insn >> 2) & 0b11;
+            a << 5 | b << 2 | c << 6
+        };
+
+        let uimm53_86 = {
+            let a = (insn >> 10) & 0b111;
+            let b = (insn >> 7) & 0b111;
+            a << 3 | b << 6
+        };
+        let uimm52_76 = {
+            let a = (insn >> 9) & 0b1111;
+            let b = (insn >> 7) & 0b11;
+            a << 2 | b << 6
+        };
+
+        match (self.xlen, b15_13, b12, rd, rs2) {
+            (32, 0b000, 1, _, _) => RvCInsn::Invalid(insn), // RV32 NSE
+            (_, 0b000, _, _, _) => RvCInsn::Slli { rd, imm: uimm5_40 },
+            (32 | 64, 0b001, _, _, _) => RvCInsn::Fldsp {
+                rd,
+                imm: uimm5_43_86 as i32,
+            },
+            (_, 0b010, _, 0, _) => RvCInsn::Invalid(insn),
+            (_, 0b010, _, _, _) => RvCInsn::Lwsp {
+                rd,
+                imm: uimm5_42_76 as i32,
+            },
+            (32, 0b011, _, _, _) => RvCInsn::Flwsp {
+                rd,
+                imm: uimm5_42_76 as i32,
+            },
+            (64 | 128, 0b011, _, 0, _) => RvCInsn::Invalid(insn),
+            (64 | 128, 0b011, _, _, _) => RvCInsn::Ldsp {
+                rd,
+                imm: uimm5_43_86 as i32,
+            },
+            (_, 0b100, 0, 0, 0) => RvCInsn::Invalid(insn),
+            (_, 0b100, 0, _, 0) => RvCInsn::Jr { rs1: rd },
+            (_, 0b100, 0, _, _) => RvCInsn::Mv { rd, rs2 }, // HINT (rd=0) not handled
+            (_, 0b100, 1, 0, 0) => RvCInsn::Ebreak,
+            (_, 0b100, 1, _, 0) => RvCInsn::Jalr { rs1: rd },
+            (_, 0b100, 1, _, _) => RvCInsn::Add { rd, rs2 }, // HINT (rd=0) not handled
+            (32 | 64, 0b101, _, _, _) => RvCInsn::Fsdsp {
+                rs2,
+                imm: uimm53_86 as i32,
+            },
+            (128, 0b101, _, _, _) => unimplemented!(),
+            (32 | 64, 0b110, _, _, _) => RvCInsn::Swsp {
+                rs2,
+                imm: uimm52_76 as i32,
+            },
+            (32, 0b111, _, _, _) => RvCInsn::Fswsp {
+                rs2,
+                imm: uimm52_76 as i32,
+            },
+            (64 | 128, 0b111, _, _, _) => RvCInsn::Sdsp {
+                rs2,
+                imm: uimm53_86 as i32,
+            },
+
+            _ => RvCInsn::Invalid(insn),
+        }
     }
 }
 
@@ -331,6 +427,16 @@ mod tests {
 
         // unimp
         assert_eq!(d.disas(0x0000), RvCInsn::Invalid(0));
+
+        // c.fld fs0,112(a0)
+        assert_eq!(
+            d.disas(0x3920),
+            RvCInsn::Fld {
+                rd: 8,
+                rs1: 10,
+                imm: 112
+            }
+        );
 
         // c.ld a5,0(s0)
         assert_eq!(
@@ -389,5 +495,37 @@ mod tests {
 
         // c.beqz a0, +38
         assert_eq!(d.disas(0xc11d), RvCInsn::Beqz { rs1: 10, imm: 38 })
+    }
+
+    #[test]
+    fn test_rv64c_quadrant_10() {
+        let d = RvCDecoder::new(64);
+
+        // c.slli a3,0x4
+        assert_eq!(d.disas(0x0692), RvCInsn::Slli { rd: 13, imm: 4 });
+
+        // c.fldsp fa7,136(sp)
+        assert_eq!(d.disas(0x28aa), RvCInsn::Fldsp { rd: 17, imm: 136 });
+
+        // c.lwsp a3,132(sp)
+        assert_eq!(d.disas(0x469a), RvCInsn::Lwsp { rd: 13, imm: 132 });
+
+        // c.add a5,a4
+        assert_eq!(d.disas(0x97ba), RvCInsn::Add { rd: 15, rs2: 14 });
+
+        // c.mv a4,s11
+        assert_eq!(d.disas(0x876e), RvCInsn::Mv { rd: 14, rs2: 27 });
+
+        // c.jr a5
+        assert_eq!(d.disas(0x8782), RvCInsn::Jr { rs1: 15 });
+
+        // c.jr ra
+        assert_eq!(d.disas(0x8082), RvCInsn::Jr { rs1: 1 });
+
+        // c.ebreak
+        assert_eq!(d.disas(0x9002), RvCInsn::Ebreak);
+
+        // c.jalr a5
+        assert_eq!(d.disas(0x9782), RvCInsn::Jalr { rs1: 15 });
     }
 }
