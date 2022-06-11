@@ -193,7 +193,7 @@ impl From<R4TypeSlots> for R4TypeArgs {
     }
 }
 
-fn simm_from_uimm(uimm: u32, width: u8) -> i32 {
+pub(super) fn simm_from_uimm(uimm: u32, width: u8) -> i32 {
     // example with width = 6, uimm = 0b100111:
     //
     // a = 1 << width = 0b1000000
