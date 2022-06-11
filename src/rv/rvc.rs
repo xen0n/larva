@@ -4,15 +4,15 @@ use super::{ITypeArgs, RTypeArgs, RvInsn, SBTypeArgs, ShiftArgs, UJTypeArgs};
 #[derive(PartialEq, Debug)]
 pub(super) enum RvCInsn {
     Invalid(u16),
-    Addi4spn { rd: u8, imm: u16 },
-    Fld { rd: u8, rs1: u8, imm: u16 },
-    Lw { rd: u8, rs1: u8, imm: u16 },
-    Flw { rd: u8, rs1: u8, imm: u16 },
-    Ld { rd: u8, rs1: u8, imm: u16 },
-    Fsd { rs1: u8, rs2: u8, imm: u16 },
-    Sw { rs1: u8, rs2: u8, imm: u16 },
-    Fsw { rs1: u8, rs2: u8, imm: u16 },
-    Sd { rs1: u8, rs2: u8, imm: u16 },
+    Addi4spn { rd: u8, imm: i32 },
+    Fld { rd: u8, rs1: u8, imm: i32 },
+    Lw { rd: u8, rs1: u8, imm: i32 },
+    Flw { rd: u8, rs1: u8, imm: i32 },
+    Ld { rd: u8, rs1: u8, imm: i32 },
+    Fsd { rs1: u8, rs2: u8, imm: i32 },
+    Sw { rs1: u8, rs2: u8, imm: i32 },
+    Fsw { rs1: u8, rs2: u8, imm: i32 },
+    Sd { rs1: u8, rs2: u8, imm: i32 },
     Addi { rd: u8, imm: i32 },
     Jal { imm: i32 },
     Addiw { rd: u8, imm: i32 },
@@ -50,60 +50,17 @@ impl From<RvCInsn> for RvInsn {
     fn from(insn: RvCInsn) -> Self {
         match insn {
             RvCInsn::Invalid(x) => Self::Invalid(x as u32),
-            RvCInsn::Addi4spn { rd, imm } => Self::Addi(ITypeArgs {
-                rd,
-                rs1: 2,
-                imm: imm as i32,
-            }),
-            RvCInsn::Fld { rd, rs1, imm } => Self::Fld(ITypeArgs {
-                rd,
-                rs1,
-                imm: imm as i32,
-            }),
-            RvCInsn::Lw { rd, rs1, imm } => Self::Lw(ITypeArgs {
-                rd,
-                rs1,
-                imm: imm as i32,
-            }),
-            RvCInsn::Flw { rd, rs1, imm } => Self::Flw(ITypeArgs {
-                rd,
-                rs1,
-                imm: imm as i32,
-            }),
-            RvCInsn::Ld { rd, rs1, imm } => Self::Ld(ITypeArgs {
-                rd,
-                rs1,
-                imm: imm as i32,
-            }),
-            RvCInsn::Fsd { rs1, rs2, imm } => Self::Fsd(SBTypeArgs {
-                rs1,
-                rs2,
-                imm: imm as i32,
-            }),
-            RvCInsn::Sw { rs1, rs2, imm } => Self::Sw(SBTypeArgs {
-                rs1,
-                rs2,
-                imm: imm as i32,
-            }),
-            RvCInsn::Fsw { rs1, rs2, imm } => Self::Fsw(SBTypeArgs {
-                rs1,
-                rs2,
-                imm: imm as i32,
-            }),
-            RvCInsn::Sd { rs1, rs2, imm } => Self::Sd(SBTypeArgs {
-                rs1,
-                rs2,
-                imm: imm as i32,
-            }),
-            RvCInsn::Addi { rd, imm } => Self::Addi(ITypeArgs {
-                rd,
-                rs1: rd,
-                imm: imm as i32,
-            }),
-            RvCInsn::Jal { imm } => Self::Jal(UJTypeArgs {
-                rd: 1,
-                imm: imm as i32,
-            }),
+            RvCInsn::Addi4spn { rd, imm } => Self::Addi(ITypeArgs { rd, rs1: 2, imm }),
+            RvCInsn::Fld { rd, rs1, imm } => Self::Fld(ITypeArgs { rd, rs1, imm }),
+            RvCInsn::Lw { rd, rs1, imm } => Self::Lw(ITypeArgs { rd, rs1, imm }),
+            RvCInsn::Flw { rd, rs1, imm } => Self::Flw(ITypeArgs { rd, rs1, imm }),
+            RvCInsn::Ld { rd, rs1, imm } => Self::Ld(ITypeArgs { rd, rs1, imm }),
+            RvCInsn::Fsd { rs1, rs2, imm } => Self::Fsd(SBTypeArgs { rs1, rs2, imm }),
+            RvCInsn::Sw { rs1, rs2, imm } => Self::Sw(SBTypeArgs { rs1, rs2, imm }),
+            RvCInsn::Fsw { rs1, rs2, imm } => Self::Fsw(SBTypeArgs { rs1, rs2, imm }),
+            RvCInsn::Sd { rs1, rs2, imm } => Self::Sd(SBTypeArgs { rs1, rs2, imm }),
+            RvCInsn::Addi { rd, imm } => Self::Addi(ITypeArgs { rd, rs1: rd, imm }),
+            RvCInsn::Jal { imm } => Self::Jal(UJTypeArgs { rd: 1, imm }),
             RvCInsn::Addiw { rd, imm } => Self::Addiw(ITypeArgs { rd, rs1: rd, imm }),
             RvCInsn::Li { rd, imm } => Self::Addi(ITypeArgs { rd, rs1: 0, imm }),
             RvCInsn::Lui { rd, imm } => Self::Lui(UJTypeArgs { rd, imm }),
@@ -192,7 +149,7 @@ impl RvCDecoder {
                 if nzuimm54_96_2_3 != 0 {
                     RvCInsn::Addi4spn {
                         rd,
-                        imm: nzuimm54_96_2_3,
+                        imm: nzuimm54_96_2_3 as i32,
                     }
                 } else {
                     RvCInsn::Invalid(insn)
@@ -201,44 +158,44 @@ impl RvCDecoder {
             (32 | 64, 0b001) => RvCInsn::Fld {
                 rd,
                 rs1,
-                imm: uimm53_76,
+                imm: uimm53_76 as i32,
             },
             (128, 0b001) => unimplemented!(),
             (_, 0b010) => RvCInsn::Lw {
                 rd,
                 rs1,
-                imm: uimm53_2_6,
+                imm: uimm53_2_6 as i32,
             },
             (32, 0b011) => RvCInsn::Flw {
                 rd,
                 rs1,
-                imm: uimm53_2_6,
+                imm: uimm53_2_6 as i32,
             },
             (64 | 128, 0b011) => RvCInsn::Ld {
                 rd,
                 rs1,
-                imm: uimm53_76,
+                imm: uimm53_76 as i32,
             },
             (32 | 64, 0b101) => RvCInsn::Fsd {
                 rs1,
                 rs2: rd,
-                imm: uimm53_76,
+                imm: uimm53_76 as i32,
             },
             (128, 0b101) => unimplemented!(),
             (_, 0b110) => RvCInsn::Sw {
                 rs1,
                 rs2: rd,
-                imm: uimm53_2_6,
+                imm: uimm53_2_6 as i32,
             },
             (32, 0b111) => RvCInsn::Fsw {
                 rs1,
                 rs2: rd,
-                imm: uimm53_2_6,
+                imm: uimm53_2_6 as i32,
             },
             (64 | 128, 0b111) => RvCInsn::Sd {
                 rs1,
                 rs2: rd,
-                imm: uimm53_76,
+                imm: uimm53_76 as i32,
             },
 
             _ => RvCInsn::Invalid(insn),
