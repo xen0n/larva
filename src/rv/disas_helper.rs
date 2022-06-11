@@ -76,11 +76,11 @@ impl ISBTypeSlots {
     }
 
     pub(super) fn rv32_shift_funct(&self) -> u8 {
-        (self.0 >> 25) as u8
+        (self.0 >> 5) as u8
     }
 
     pub(super) fn rv64_shift_funct(&self) -> u8 {
-        (self.0 >> 26) as u8
+        (self.0 >> 6) as u8
     }
 
     pub(super) fn fence_fm(&self) -> u8 {
