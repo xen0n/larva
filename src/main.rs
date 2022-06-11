@@ -3,7 +3,7 @@ mod rv;
 fn main() {
     macro_rules! d {
         ($x: expr) => {
-            println!("{:?}", rv::disas_riscv_insn_32bit($x));
+            println!("{:?}", rv::disas_32bit($x));
         };
     }
 

@@ -181,35 +181,35 @@ pub enum RvInsn {
     FmvDX(R2TypeArgs),
 }
 
-pub fn disas_riscv_insn_32bit(insn: u32) -> RvInsn {
+pub fn disas_32bit(insn: u32) -> RvInsn {
     let opcode = (insn >> 2) & 0b11111;
     match opcode {
-        0b00_000 => disas_riscv_insn_load(insn),
-        0b00_001 => disas_riscv_insn_load_fp(insn),
-        0b00_011 => disas_riscv_insn_misc_mem(insn),
-        0b00_100 => disas_riscv_insn_op_imm(insn),
+        0b00_000 => disas_load(insn),
+        0b00_001 => disas_load_fp(insn),
+        0b00_011 => disas_misc_mem(insn),
+        0b00_100 => disas_op_imm(insn),
         0b00_101 => RvInsn::Auipc(disas_u(insn).into()),
-        0b00_110 => disas_riscv_insn_op_imm_32(insn),
-        0b01_000 => disas_riscv_insn_store(insn),
-        0b01_001 => disas_riscv_insn_store_fp(insn),
-        0b01_011 => disas_riscv_insn_amo(insn),
-        0b01_100 => disas_riscv_insn_op(insn),
+        0b00_110 => disas_op_imm_32(insn),
+        0b01_000 => disas_store(insn),
+        0b01_001 => disas_store_fp(insn),
+        0b01_011 => disas_amo(insn),
+        0b01_100 => disas_op(insn),
         0b01_101 => RvInsn::Lui(disas_u(insn).into()),
-        0b01_110 => disas_riscv_insn_op_32(insn),
-        0b10_000 => disas_riscv_insn_madd(insn),
-        0b10_001 => disas_riscv_insn_msub(insn),
-        0b10_010 => disas_riscv_insn_nmsub(insn),
-        0b10_011 => disas_riscv_insn_nmadd(insn),
-        0b10_100 => disas_riscv_insn_op_fp(insn),
-        0b11_000 => disas_riscv_insn_branch(insn),
-        0b11_001 => disas_riscv_insn_jalr(insn),
+        0b01_110 => disas_op_32(insn),
+        0b10_000 => disas_madd(insn),
+        0b10_001 => disas_msub(insn),
+        0b10_010 => disas_nmsub(insn),
+        0b10_011 => disas_nmadd(insn),
+        0b10_100 => disas_op_fp(insn),
+        0b11_000 => disas_branch(insn),
+        0b11_001 => disas_jalr(insn),
         0b11_011 => RvInsn::Jal(disas_j(insn).into()),
-        0b11_100 => disas_riscv_insn_system(insn),
+        0b11_100 => disas_system(insn),
         _ => RvInsn::Invalid(insn),
     }
 }
 
-fn disas_riscv_insn_load(insn: u32) -> RvInsn {
+fn disas_load(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b000 => RvInsn::Lb(s.into()),
@@ -225,7 +225,7 @@ fn disas_riscv_insn_load(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_load_fp(insn: u32) -> RvInsn {
+fn disas_load_fp(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b010 => RvInsn::Flw(s.into()),
@@ -234,7 +234,7 @@ fn disas_riscv_insn_load_fp(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_misc_mem(insn: u32) -> RvInsn {
+fn disas_misc_mem(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b000 => RvInsn::Fence(s.into()),
@@ -243,7 +243,7 @@ fn disas_riscv_insn_misc_mem(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_op_imm(insn: u32) -> RvInsn {
+fn disas_op_imm(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b000 => RvInsn::Addi(s.into()),
@@ -264,7 +264,7 @@ fn disas_riscv_insn_op_imm(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_op_imm_32(insn: u32) -> RvInsn {
+fn disas_op_imm_32(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match (s.rv32_shift_funct(), s.i_funct3()) {
         (_, 0b000) => RvInsn::Addiw(s.into()),
@@ -276,7 +276,7 @@ fn disas_riscv_insn_op_imm_32(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_store(insn: u32) -> RvInsn {
+fn disas_store(insn: u32) -> RvInsn {
     let s = disas_s(insn);
     match s.sb_funct3() {
         0b000 => RvInsn::Sb(s.into()),
@@ -289,7 +289,7 @@ fn disas_riscv_insn_store(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_store_fp(insn: u32) -> RvInsn {
+fn disas_store_fp(insn: u32) -> RvInsn {
     let s = disas_s(insn);
     match s.sb_funct3() {
         0b010 => RvInsn::Fsw(s.into()),
@@ -298,7 +298,7 @@ fn disas_riscv_insn_store_fp(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_amo(insn: u32) -> RvInsn {
+fn disas_amo(insn: u32) -> RvInsn {
     let s = disas_r(insn);
     match (s.funct3(), s.amo_funct()) {
         (0b010, 0b00010) => {
@@ -341,7 +341,7 @@ fn disas_riscv_insn_amo(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_op(insn: u32) -> RvInsn {
+fn disas_op(insn: u32) -> RvInsn {
     let s = disas_r(insn);
     match (s.funct7(), s.funct3()) {
         (0b0000000, 0b000) => RvInsn::Add(s.into()),
@@ -368,7 +368,7 @@ fn disas_riscv_insn_op(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_op_32(insn: u32) -> RvInsn {
+fn disas_op_32(insn: u32) -> RvInsn {
     let s = disas_r(insn);
     match (s.funct7(), s.funct3()) {
         (0b0000000, 0b000) => RvInsn::Addw(s.into()),
@@ -387,7 +387,7 @@ fn disas_riscv_insn_op_32(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_madd(insn: u32) -> RvInsn {
+fn disas_madd(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FmaddS(s.into()),
@@ -396,7 +396,7 @@ fn disas_riscv_insn_madd(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_msub(insn: u32) -> RvInsn {
+fn disas_msub(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FmsubS(s.into()),
@@ -405,7 +405,7 @@ fn disas_riscv_insn_msub(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_nmsub(insn: u32) -> RvInsn {
+fn disas_nmsub(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FnmsubS(s.into()),
@@ -414,7 +414,7 @@ fn disas_riscv_insn_nmsub(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_nmadd(insn: u32) -> RvInsn {
+fn disas_nmadd(insn: u32) -> RvInsn {
     let s = disas_r4(insn);
     match s.funct2() {
         0b00 => RvInsn::FnmaddS(s.into()),
@@ -423,7 +423,7 @@ fn disas_riscv_insn_nmadd(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_op_fp(insn: u32) -> RvInsn {
+fn disas_op_fp(insn: u32) -> RvInsn {
     let s = disas_r(insn);
     match (s.funct7(), s.rs2(), s.funct3()) {
         // RV32F
@@ -488,7 +488,7 @@ fn disas_riscv_insn_op_fp(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_branch(insn: u32) -> RvInsn {
+fn disas_branch(insn: u32) -> RvInsn {
     let s = disas_b(insn);
     match s.sb_funct3() {
         0b000 => RvInsn::Beq(s.into()),
@@ -501,7 +501,7 @@ fn disas_riscv_insn_branch(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_jalr(insn: u32) -> RvInsn {
+fn disas_jalr(insn: u32) -> RvInsn {
     let s = disas_i(insn);
     match s.i_funct3() {
         0b000 => RvInsn::Jalr(s.into()),
@@ -509,7 +509,7 @@ fn disas_riscv_insn_jalr(insn: u32) -> RvInsn {
     }
 }
 
-fn disas_riscv_insn_system(insn: u32) -> RvInsn {
+fn disas_system(insn: u32) -> RvInsn {
     match insn {
         0x00000073 => RvInsn::Ecall,
         0x00100073 => RvInsn::Ebreak,
