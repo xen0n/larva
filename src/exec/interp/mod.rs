@@ -131,6 +131,10 @@ impl<'a> RvInterpreterExecutor<'a> {
         (self.state.get_pc() as i64 + imm) as u64
     }
 
+    fn gx(&self, idx: u8) -> u64 {
+        self.state.get_x(idx)
+    }
+
     // returns None if successful exit
     pub fn exec(&mut self, entry_pc: u64) -> Option<StopReason> {
         self.state.set_pc(entry_pc);
@@ -203,11 +207,11 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::Jalr(a) => {
                 let pc = self.state.get_pc();
                 self.state.set_x(a.rd, pc + insn_len as u64);
-                StopReason::ContinueAt((self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64)
+                StopReason::ContinueAt((self.gx(a.rs1) as i64 + a.imm as i64) as u64)
             }
             RvInsn::Beq(a) => {
-                let v1 = self.state.get_x(a.rs1);
-                let v2 = self.state.get_x(a.rs2);
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
                 if v1 == v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -216,8 +220,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Bne(a) => {
                 // TODO: dedup
-                let v1 = self.state.get_x(a.rs1);
-                let v2 = self.state.get_x(a.rs2);
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
                 if v1 != v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -225,8 +229,8 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Blt(a) => {
-                let v1 = self.state.get_x(a.rs1) as i64;
-                let v2 = self.state.get_x(a.rs2) as i64;
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
                 if v1 < v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -235,8 +239,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Bge(a) => {
                 // TODO: dedup
-                let v1 = self.state.get_x(a.rs1) as i64;
-                let v2 = self.state.get_x(a.rs2) as i64;
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
                 if v1 >= v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -244,8 +248,8 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Bltu(a) => {
-                let v1 = self.state.get_x(a.rs1);
-                let v2 = self.state.get_x(a.rs2);
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
                 if v1 < v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -254,8 +258,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Bgeu(a) => {
                 // TODO: dedup
-                let v1 = self.state.get_x(a.rs1) as i64;
-                let v2 = self.state.get_x(a.rs2) as i64;
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
                 if v1 >= v2 {
                     StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
@@ -263,7 +267,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Lb(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u8(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, sext_u8(v));
@@ -273,7 +277,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Lh(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u16(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, sext_u16(v));
@@ -283,7 +287,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Lw(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u32(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, sext_u32(v));
@@ -293,7 +297,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Lbu(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u8(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, v as u64);
@@ -303,7 +307,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Lhu(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u16(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, v as u64);
@@ -313,25 +317,25 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Sb(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
-                self.set_u8(addr.into(), self.state.get_x(a.rs2) as u8)
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u8(addr.into(), self.gx(a.rs2) as u8)
                     .err()
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Sh(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
-                self.set_u16(addr.into(), self.state.get_x(a.rs2) as u16)
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u16(addr.into(), self.gx(a.rs2) as u16)
                     .err()
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Sw(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
-                self.set_u32(addr.into(), self.state.get_x(a.rs2) as u32)
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u32(addr.into(), self.gx(a.rs2) as u32)
                     .err()
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Addi(a) => {
-                let v = self.state.get_x(a.rs1) as i64 + a.imm as i64;
+                let v = self.gx(a.rs1) as i64 + a.imm as i64;
                 self.state.set_x(a.rd, v as u64);
                 StopReason::Next
             }
@@ -344,7 +348,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::Srli(_) => todo!(),
             RvInsn::Srai(_) => todo!(),
             RvInsn::Add(a) => {
-                let v = self.state.get_x(a.rs1) as i64 + self.state.get_x(a.rs2) as i64;
+                let v = self.gx(a.rs1) as i64 + self.gx(a.rs2) as i64;
                 self.state.set_x(a.rd, v as u64);
                 StopReason::Next
             }
@@ -360,7 +364,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::Fence(_) => todo!(),
             RvInsn::FenceI(_) => todo!(),
             RvInsn::Lwu(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u32(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, v as u64);
@@ -370,7 +374,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Ld(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u64(addr.into()) {
                     Ok(v) => {
                         self.state.set_x(a.rd, v);
@@ -380,13 +384,13 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             RvInsn::Sd(a) => {
-                let addr = (self.state.get_x(a.rs1) as i64 + a.imm as i64) as u64;
-                self.set_u64(addr.into(), self.state.get_x(a.rs2))
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u64(addr.into(), self.gx(a.rs2))
                     .err()
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Addiw(a) => {
-                let v = self.state.get_x(a.rs1) as i32 + a.imm as i32;
+                let v = self.gx(a.rs1) as i32 + a.imm as i32;
                 self.state.set_x(a.rd, v as i64 as u64);
                 StopReason::Next
             }
@@ -394,7 +398,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::Srliw(_) => todo!(),
             RvInsn::Sraiw(_) => todo!(),
             RvInsn::Addw(a) => {
-                let v = self.state.get_x(a.rs1) as i32 + self.state.get_x(a.rs2) as i32;
+                let v = self.gx(a.rs1) as i32 + self.gx(a.rs2) as i32;
                 self.state.set_x(a.rd, v as i64 as u64);
                 StopReason::Next
             }
