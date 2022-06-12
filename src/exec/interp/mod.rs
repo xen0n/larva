@@ -127,6 +127,10 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
     }
 
+    fn pcrel(&self, imm: i64) -> u64 {
+        (self.state.get_pc() as i64 + imm) as u64
+    }
+
     // returns None if successful exit
     pub fn exec(&mut self, entry_pc: u64) -> Option<StopReason> {
         self.state.set_pc(entry_pc);
@@ -188,8 +192,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 StopReason::Next
             }
             RvInsn::Auipc(a) => {
-                self.state
-                    .set_x(a.rd, (self.state.get_pc() as i64 + a.imm as i64) as u64);
+                self.state.set_x(a.rd, self.pcrel(a.imm as i64));
                 StopReason::Next
             }
             RvInsn::Jal(a) => {
@@ -206,7 +209,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1);
                 let v2 = self.state.get_x(a.rs2);
                 if v1 == v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
@@ -216,7 +219,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1);
                 let v2 = self.state.get_x(a.rs2);
                 if v1 != v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
@@ -225,7 +228,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1) as i64;
                 let v2 = self.state.get_x(a.rs2) as i64;
                 if v1 < v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
@@ -235,7 +238,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1) as i64;
                 let v2 = self.state.get_x(a.rs2) as i64;
                 if v1 >= v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
@@ -244,7 +247,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1);
                 let v2 = self.state.get_x(a.rs2);
                 if v1 < v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
@@ -254,7 +257,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let v1 = self.state.get_x(a.rs1) as i64;
                 let v2 = self.state.get_x(a.rs2) as i64;
                 if v1 >= v2 {
-                    StopReason::ContinueAt((self.state.get_pc() as i64 + a.imm as i64) as u64)
+                    StopReason::ContinueAt(self.pcrel(a.imm as i64))
                 } else {
                     StopReason::Next
                 }
