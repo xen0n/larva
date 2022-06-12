@@ -217,6 +217,14 @@ impl RvDecoder {
             }
         }
     }
+
+    pub fn disas_16bit(&self, insn: u16) -> RvInsn {
+        self.rvc.disas(insn).into()
+    }
+
+    pub fn disas_32bit(&self, insn: u32) -> RvInsn {
+        disas_32bit(insn)
+    }
 }
 
 fn disas_32bit(insn: u32) -> RvInsn {

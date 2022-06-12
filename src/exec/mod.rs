@@ -1,4 +1,5 @@
 pub mod interp;
+pub mod mem;
 
 #[derive(Debug)]
 pub enum StopReason {
@@ -7,6 +8,7 @@ pub enum StopReason {
 
     Break,
     ReservedInsn,
+    Segv { read: bool, gaddr: u64 },
 }
 
 #[derive(PartialEq, Debug, Default)]

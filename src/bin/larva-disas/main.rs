@@ -1,10 +1,10 @@
 use larva::rv::RvDecoder;
 
 fn main() {
-        let argv = std::env::args();
-        for input_path in argv.skip(1) {
-            process(&input_path);
-        }
+    let argv = std::env::args();
+    for input_path in argv.skip(1) {
+        process(&input_path);
+    }
 }
 
 fn process(input_path: &str) {
