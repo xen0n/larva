@@ -1,8 +1,9 @@
 # LARVa - Bridging LoongArch to RISC-V
 
 This project is a proof-of-concept RISC-V emulator aiming at near-native
-execution performance, currently targeting the LoongArch but may expand to
-other architectures in the future.
+execution performance on LoongArch.
+Support may expand to other architectures in the future, if the techniques
+employed here prove useful and reasonably arch-independent.
 
 The project is named after a popular but extremely difficult chart with the
 same name, in the rhythm game *maimai*. Binary translation is hard, running such
@@ -16,10 +17,14 @@ chart at all, I do hope to manage the difficulty *here* somehow!
 ## Roadmap
 
 * [x] RV64GC disassembly
-* [ ] verification interpreter
-* [ ] LoongArch assembly
+* [ ] verification interpreter -- WIP
+* [ ] emulation machinery
+    * [x] guest MMU -- barebones
 * [ ] linux-user emulation
-    * [ ] translation pass
-    * [ ] basic JIT machinery
+    * [x] stack -- works okay
+    * [ ] thread-local storage
+    * [ ] syscalls -- WIP, only `exit_group` so far
+* [ ] LoongArch assembly
+* [ ] translation passes
 * [ ] system level PoC
     - TODO

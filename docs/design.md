@@ -9,7 +9,7 @@ transparency of emulation.
 
 These are nearly 1:1, which is extremely convenient.
 
-We model an RV64IMA core, so XLEN=64 is assumed for native-width insns below.
+We model an RV64GC core, so XLEN=64 is assumed for native-width insns below.
 
 |RV Privileged|LA64|
 |:------------|:---|
@@ -130,3 +130,5 @@ LA64 correspondence.
 |`amomax_d`|`ammax.d`|
 |`amominu_d`|`ammin.du`|
 |`amomaxu_d`|`ammax.du`|
+
+RVF and RVD correspondences: TODO
