@@ -345,9 +345,21 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Slti(_) => todo!(),
             RvInsn::Sltiu(_) => todo!(),
-            RvInsn::Xori(_) => todo!(),
-            RvInsn::Ori(_) => todo!(),
-            RvInsn::Andi(_) => todo!(),
+            RvInsn::Xori(a) => {
+                let v = self.gx(a.rs1) ^ (a.imm as i64 as u64);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Ori(a) => {
+                let v = self.gx(a.rs1) | (a.imm as i64 as u64);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Andi(a) => {
+                let v = self.gx(a.rs1) & (a.imm as i64 as u64);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Slli(_) => todo!(),
             RvInsn::Srli(_) => todo!(),
             RvInsn::Srai(_) => todo!(),
@@ -356,15 +368,31 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v as u64);
                 StopReason::Next
             }
-            RvInsn::Sub(_) => todo!(),
+            RvInsn::Sub(a) => {
+                let v = self.gx(a.rs1) as i64 - self.gx(a.rs2) as i64;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
             RvInsn::Sll(_) => todo!(),
             RvInsn::Slt(_) => todo!(),
             RvInsn::Sltu(_) => todo!(),
-            RvInsn::Xor(_) => todo!(),
+            RvInsn::Xor(a) => {
+                let v = self.gx(a.rs1) ^ self.gx(a.rs2);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Srl(_) => todo!(),
             RvInsn::Sra(_) => todo!(),
-            RvInsn::Or(_) => todo!(),
-            RvInsn::And(_) => todo!(),
+            RvInsn::Or(a) => {
+                let v = self.gx(a.rs1) | self.gx(a.rs2);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::And(a) => {
+                let v = self.gx(a.rs1) & self.gx(a.rs2);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Fence(_) => todo!(),
             RvInsn::FenceI(_) => todo!(),
             RvInsn::Lwu(a) => {
