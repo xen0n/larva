@@ -5,6 +5,8 @@ use crate::rv::{RvDecoder, RvInsn};
 mod syscall;
 
 pub struct RvInterpreterExecutor<'a> {
+    shamt_mask: u64,
+
     state: &'a mut RvIsaState,
     mmu: &'a mut GuestMmu,
 
@@ -24,8 +26,9 @@ fn sext_u32(x: u32) -> u64 {
 }
 
 impl<'a> RvInterpreterExecutor<'a> {
-    pub fn new(state: &'a mut RvIsaState, mmu: &'a mut GuestMmu) -> Self {
+    pub fn new(xlen: usize, state: &'a mut RvIsaState, mmu: &'a mut GuestMmu) -> Self {
         Self {
+            shamt_mask: (xlen - 1) as u64,
             state,
             mmu,
             decoder: RvDecoder::new(64),
@@ -360,9 +363,21 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v);
                 StopReason::Next
             }
-            RvInsn::Slli(_) => todo!(),
-            RvInsn::Srli(_) => todo!(),
-            RvInsn::Srai(_) => todo!(),
+            RvInsn::Slli(a) => {
+                let v = self.gx(a.rs1) << a.shamt;
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Srli(a) => {
+                let v = self.gx(a.rs1) >> a.shamt;
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Srai(a) => {
+                let v = self.gx(a.rs1) as i64 >> a.shamt;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
             RvInsn::Add(a) => {
                 let v = self.gx(a.rs1) as i64 + self.gx(a.rs2) as i64;
                 self.sx(a.rd, v as u64);
@@ -373,7 +388,11 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v as u64);
                 StopReason::Next
             }
-            RvInsn::Sll(_) => todo!(),
+            RvInsn::Sll(a) => {
+                let v = self.gx(a.rs1) << (self.gx(a.rs2) & self.shamt_mask);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Slt(_) => todo!(),
             RvInsn::Sltu(_) => todo!(),
             RvInsn::Xor(a) => {
@@ -381,8 +400,16 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v);
                 StopReason::Next
             }
-            RvInsn::Srl(_) => todo!(),
-            RvInsn::Sra(_) => todo!(),
+            RvInsn::Srl(a) => {
+                let v = self.gx(a.rs1) >> (self.gx(a.rs2) & self.shamt_mask);
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Sra(a) => {
+                let v = self.gx(a.rs1) as i64 >> (self.gx(a.rs2) & self.shamt_mask);
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
             RvInsn::Or(a) => {
                 let v = self.gx(a.rs1) | self.gx(a.rs2);
                 self.sx(a.rd, v);

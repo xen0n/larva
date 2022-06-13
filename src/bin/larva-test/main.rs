@@ -46,7 +46,7 @@ fn main() {
     let mut mmu = exec::mem::GuestMmu::new(4096); // RV uses 4K pages
     mmu.consume_host(mem.as_ptr(), mem.len()).unwrap();
 
-    let mut executor = exec::interp::RvInterpreterExecutor::new(&mut state, &mut mmu);
+    let mut executor = exec::interp::RvInterpreterExecutor::new(64, &mut state, &mut mmu);
     executor.stack(4096).unwrap();
 
     let block_addr = mem.as_ptr() as u64;
