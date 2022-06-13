@@ -453,18 +453,46 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v as i64 as u64);
                 StopReason::Next
             }
-            RvInsn::Slliw(_) => todo!(),
-            RvInsn::Srliw(_) => todo!(),
-            RvInsn::Sraiw(_) => todo!(),
+            RvInsn::Slliw(a) => {
+                let v = (self.gx(a.rs1) as u32) << a.shamt;
+                self.sx(a.rd, v as i32 as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Srliw(a) => {
+                let v = self.gx(a.rs1) as u32 >> a.shamt;
+                self.sx(a.rd, v as i32 as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Sraiw(a) => {
+                let v = self.gx(a.rs1) as i32 >> a.shamt;
+                self.sx(a.rd, v as i64 as u64);
+                StopReason::Next
+            }
             RvInsn::Addw(a) => {
                 let v = self.gx(a.rs1) as i32 + self.gx(a.rs2) as i32;
                 self.sx(a.rd, v as i64 as u64);
                 StopReason::Next
             }
-            RvInsn::Subw(_) => todo!(),
-            RvInsn::Sllw(_) => todo!(),
-            RvInsn::Srlw(_) => todo!(),
-            RvInsn::Sraw(_) => todo!(),
+            RvInsn::Subw(a) => {
+                let v = self.gx(a.rs1) as i32 - self.gx(a.rs2) as i32;
+                self.sx(a.rd, v as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Sllw(a) => {
+                let v = (self.gx(a.rs1) as u32) << (self.gx(a.rs2) & 31);
+                self.sx(a.rd, v as i32 as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Srlw(a) => {
+                let v = self.gx(a.rs1) as u32 >> (self.gx(a.rs2) & 31);
+                self.sx(a.rd, v as i32 as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Sraw(a) => {
+                let v = self.gx(a.rs1) as i32 >> (self.gx(a.rs2) & 31);
+                self.sx(a.rd, v as i64 as u64);
+                StopReason::Next
+            }
             RvInsn::Mul(_) => todo!(),
             RvInsn::Mulh(_) => todo!(),
             RvInsn::Mulhsu(_) => todo!(),
