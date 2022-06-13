@@ -346,8 +346,24 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v as u64);
                 StopReason::Next
             }
-            RvInsn::Slti(_) => todo!(),
-            RvInsn::Sltiu(_) => todo!(),
+            RvInsn::Slti(a) => {
+                let v = if (self.gx(a.rs1) as i64) < a.imm as i64 {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Sltiu(a) => {
+                let v = if self.gx(a.rs1) < a.imm as i64 as u64 {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Xori(a) => {
                 let v = self.gx(a.rs1) ^ (a.imm as i64 as u64);
                 self.sx(a.rd, v);
@@ -393,8 +409,24 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v);
                 StopReason::Next
             }
-            RvInsn::Slt(_) => todo!(),
-            RvInsn::Sltu(_) => todo!(),
+            RvInsn::Slt(a) => {
+                let v = if (self.gx(a.rs1) as i64) < self.gx(a.rs2) as i64 {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::Sltu(a) => {
+                let v = if self.gx(a.rs1) < self.gx(a.rs2) {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::Xor(a) => {
                 let v = self.gx(a.rs1) ^ self.gx(a.rs2);
                 self.sx(a.rd, v);
