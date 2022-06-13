@@ -31,7 +31,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             shamt_mask: (xlen - 1) as u64,
             state,
             mmu,
-            decoder: RvDecoder::new(64),
+            decoder: RvDecoder::new(xlen),
         }
     }
 
