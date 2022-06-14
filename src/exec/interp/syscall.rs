@@ -17,6 +17,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             nr, arg0, arg1, arg2, arg3, arg4, arg5
         );
         match nr {
+            64 => self.do_sys_3args(libc::SYS_write, arg0, arg1, arg2),
             // exit_group
             93 => self.do_sys_exit_group(arg0),
 
@@ -33,5 +34,11 @@ impl<'a> RvInterpreterExecutor<'a> {
             libc::syscall(libc::SYS_exit_group, exitcode as i64);
         }
         unreachable!();
+    }
+
+    fn do_sys_3args(&mut self, nr: i64, arg0: u64, arg1: u64, arg2: u64) -> StopReason {
+        let ret = unsafe { libc::syscall(nr, arg0, arg1, arg2) };
+        self.sx(10, ret as u64);
+        StopReason::Next
     }
 }
