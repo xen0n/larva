@@ -15,7 +15,7 @@ pub enum StopReason {
 pub struct RvIsaState {
     pc: u64,
     regs_x: [u64; 31],
-    regs_f: [f64; 32],
+    regs_f: [u64; 32],
 }
 
 impl RvIsaState {
@@ -44,13 +44,23 @@ impl RvIsaState {
         self.regs_x[idx as usize - 1] = val;
     }
 
+    pub fn get_f32(&self, idx: u8) -> f32 {
+        debug_assert!(idx < 32);
+        self.regs_f[idx as usize] as u32 as f32
+    }
+
+    pub fn set_f32(&mut self, idx: u8, val: f32) {
+        debug_assert!(idx < 32);
+        self.regs_f[idx as usize] = val as i32 as i64 as u64;
+    }
+
     pub fn get_f64(&self, idx: u8) -> f64 {
         debug_assert!(idx < 32);
-        self.regs_f[idx as usize]
+        self.regs_f[idx as usize] as f64
     }
 
     pub fn set_f64(&mut self, idx: u8, val: f64) {
         debug_assert!(idx < 32);
-        self.regs_f[idx as usize] = val;
+        self.regs_f[idx as usize] = val as u64;
     }
 }

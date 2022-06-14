@@ -142,6 +142,22 @@ impl<'a> RvInterpreterExecutor<'a> {
         self.state.set_x(idx, val)
     }
 
+    fn gf32(&self, idx: u8) -> f32 {
+        self.state.get_f32(idx)
+    }
+
+    fn sf32(&mut self, idx: u8, val: f32) {
+        self.state.set_f32(idx, val)
+    }
+
+    fn gf64(&self, idx: u8) -> f64 {
+        self.state.get_f64(idx)
+    }
+
+    fn sf64(&mut self, idx: u8, val: f64) {
+        self.state.set_f64(idx, val)
+    }
+
     // returns None if successful exit
     pub fn exec(&mut self, entry_pc: u64) -> Option<StopReason> {
         self.state.set_pc(entry_pc);
@@ -629,8 +645,22 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::AmoMaxD(_) => todo!(),
             RvInsn::AmoMinuD(_) => todo!(),
             RvInsn::AmoMaxuD(_) => todo!(),
-            RvInsn::Flw(_) => todo!(),
-            RvInsn::Fsw(_) => todo!(),
+            RvInsn::Flw(a) => {
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                match self.get_u32(addr.into()) {
+                    Ok(v) => {
+                        self.sf32(a.rd, v as f32);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            RvInsn::Fsw(a) => {
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u32(addr.into(), self.gf32(a.rs2) as u32)
+                    .err()
+                    .unwrap_or(StopReason::Next)
+            }
             RvInsn::FmaddS(_) => todo!(),
             RvInsn::FmsubS(_) => todo!(),
             RvInsn::FnmsubS(_) => todo!(),
@@ -647,20 +677,40 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::FmaxS(_) => todo!(),
             RvInsn::FcvtWS(_) => todo!(),
             RvInsn::FcvtWuS(_) => todo!(),
-            RvInsn::FmvXW(_) => todo!(),
+            RvInsn::FmvXW(a) => {
+                self.sx(a.rd, self.gf32(a.rs1) as i32 as i64 as u64);
+                StopReason::Next
+            }
             RvInsn::FeqS(_) => todo!(),
             RvInsn::FltS(_) => todo!(),
             RvInsn::FleS(_) => todo!(),
             RvInsn::FclassS(_) => todo!(),
             RvInsn::FcvtSW(_) => todo!(),
             RvInsn::FcvtSWu(_) => todo!(),
-            RvInsn::FmvWX(_) => todo!(),
+            RvInsn::FmvWX(a) => {
+                self.sf32(a.rd, self.gx(a.rs1) as u32 as f32);
+                StopReason::Next
+            }
             RvInsn::FcvtLS(_) => todo!(),
             RvInsn::FcvtLuS(_) => todo!(),
             RvInsn::FcvtSL(_) => todo!(),
             RvInsn::FcvtSLu(_) => todo!(),
-            RvInsn::Fld(_) => todo!(),
-            RvInsn::Fsd(_) => todo!(),
+            RvInsn::Fld(a) => {
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                match self.get_u64(addr.into()) {
+                    Ok(v) => {
+                        self.sf64(a.rd, v as f64);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            RvInsn::Fsd(a) => {
+                let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
+                self.set_u64(addr.into(), self.gf64(a.rs2) as u64)
+                    .err()
+                    .unwrap_or(StopReason::Next)
+            }
             RvInsn::FmaddD(_) => todo!(),
             RvInsn::FmsubD(_) => todo!(),
             RvInsn::FnmsubD(_) => todo!(),
@@ -687,10 +737,16 @@ impl<'a> RvInterpreterExecutor<'a> {
             RvInsn::FcvtDWu(_) => todo!(),
             RvInsn::FcvtLD(_) => todo!(),
             RvInsn::FcvtLuD(_) => todo!(),
-            RvInsn::FmvXD(_) => todo!(),
+            RvInsn::FmvXD(a) => {
+                self.sx(a.rd, self.gf64(a.rs1) as u64);
+                StopReason::Next
+            }
             RvInsn::FcvtDL(_) => todo!(),
             RvInsn::FcvtDLu(_) => todo!(),
-            RvInsn::FmvDX(_) => todo!(),
+            RvInsn::FmvDX(a) => {
+                self.sf64(a.rd, self.gx(a.rs1) as f64);
+                StopReason::Next
+            }
         }
     }
 }
