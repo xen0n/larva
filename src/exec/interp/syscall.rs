@@ -12,17 +12,22 @@ impl<'a> RvInterpreterExecutor<'a> {
         let arg4 = self.state.get_x(14); // a4
         let arg5 = self.state.get_x(15); // a5
 
-        println!(
-            "syscall: {} ({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
-            nr, arg0, arg1, arg2, arg3, arg4, arg5
-        );
+        if self.debug {
+            println!(
+                "syscall: {} ({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
+                nr, arg0, arg1, arg2, arg3, arg4, arg5
+            );
+        }
         match nr {
             64 => self.do_sys_3args(libc::SYS_write, arg0, arg1, arg2),
             // exit_group
             93 => self.do_sys_exit_group(arg0),
 
             _ => {
-                println!("unimplemented syscall");
+                println!(
+                    "unimplemented syscall: {} ({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
+                    nr, arg0, arg1, arg2, arg3, arg4, arg5
+                );
                 self.state.set_x(10, u64::wrapping_neg(38)); // -ENOSYS
                 StopReason::Next
             }

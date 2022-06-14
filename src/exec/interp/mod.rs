@@ -5,6 +5,7 @@ use crate::rv::{RvDecoder, RvInsn};
 mod syscall;
 
 pub struct RvInterpreterExecutor<'a> {
+    debug: bool,
     shamt_mask: u64,
 
     state: &'a mut RvIsaState,
@@ -28,11 +29,16 @@ fn sext_u32(x: u32) -> u64 {
 impl<'a> RvInterpreterExecutor<'a> {
     pub fn new(xlen: usize, state: &'a mut RvIsaState, mmu: &'a mut GuestMmu) -> Self {
         Self {
+            debug: false,
             shamt_mask: (xlen - 1) as u64,
             state,
             mmu,
             decoder: RvDecoder::new(xlen),
         }
+    }
+
+    pub fn debug(&mut self, val: bool) {
+        self.debug = val;
     }
 
     pub fn stack(&mut self, len: usize) -> ::std::io::Result<()> {
@@ -173,7 +179,9 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn fetch_insn(&self) -> Result<(RvInsn, usize), StopReason> {
         let pc = self.state.get_pc();
-        // println!("pc = {:016x}", pc);
+        if self.debug {
+            println!("pc = {:016x}", pc);
+        }
 
         // XXX: this is duplicating code from decoder, ideally decoder will
         // handle all of this
@@ -194,7 +202,9 @@ impl<'a> RvInterpreterExecutor<'a> {
             Ok((insn, len)) => (insn, len),
             Err(e) => return e,
         };
-        // println!("decoded {}b: {:?}", len, insn);
+        if self.debug {
+            println!("decoded {}b: {:?}", len, insn);
+        }
 
         let res = self.interpret_one(&insn, len);
 
@@ -468,7 +478,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v);
                 StopReason::Next
             }
-            RvInsn::Fence(a) => {
+            RvInsn::Fence(_) => {
                 // TODO: currently all treated as full fences
                 std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
                 StopReason::Next
