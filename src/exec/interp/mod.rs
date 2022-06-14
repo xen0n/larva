@@ -468,7 +468,11 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v);
                 StopReason::Next
             }
-            RvInsn::Fence(_) => todo!(),
+            RvInsn::Fence(a) => {
+                // TODO: currently all treated as full fences
+                std::sync::atomic::fence(std::sync::atomic::Ordering::SeqCst);
+                StopReason::Next
+            }
             RvInsn::FenceI(_) => todo!(),
             RvInsn::Lwu(a) => {
                 let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
