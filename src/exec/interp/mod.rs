@@ -525,19 +525,88 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v as i64 as u64);
                 StopReason::Next
             }
-            RvInsn::Mul(_) => todo!(),
-            RvInsn::Mulh(_) => todo!(),
-            RvInsn::Mulhsu(_) => todo!(),
-            RvInsn::Mulhu(_) => todo!(),
-            RvInsn::Div(_) => todo!(),
-            RvInsn::Divu(_) => todo!(),
-            RvInsn::Rem(_) => todo!(),
-            RvInsn::Remu(_) => todo!(),
-            RvInsn::Mulw(_) => todo!(),
-            RvInsn::Divw(_) => todo!(),
-            RvInsn::Divuw(_) => todo!(),
-            RvInsn::Remw(_) => todo!(),
-            RvInsn::Remuw(_) => todo!(),
+            RvInsn::Mul(a) => {
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
+                self.sx(a.rd, v1.wrapping_mul(v2) as u64);
+                StopReason::Next
+            }
+            RvInsn::Mulh(a) => {
+                let v1 = self.gx(a.rs1) as i64 as i128;
+                let v2 = self.gx(a.rs2) as i64 as i128;
+                let v = (v1 * v2) >> 64;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
+            RvInsn::Mulhsu(a) => {
+                let v1 = self.gx(a.rs1) as i64 as i128;
+                let v2 = self.gx(a.rs1) as u64 as i128;
+                let v = (v1 * v2) >> 64;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
+            RvInsn::Mulhu(a) => {
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
+                // let (_, v) = v1.widening_mul(v2);
+                let v = (v1 as u128 * v2 as u128) >> 64;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
+            RvInsn::Div(a) => {
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
+                self.sx(a.rd, v1.wrapping_div(v2) as u64);
+                StopReason::Next
+            }
+            RvInsn::Divu(a) => {
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
+                self.sx(a.rd, v1.wrapping_div(v2));
+                StopReason::Next
+            }
+            RvInsn::Rem(a) => {
+                let v1 = self.gx(a.rs1) as i64;
+                let v2 = self.gx(a.rs2) as i64;
+                self.sx(a.rd, v1.wrapping_rem(v2) as u64);
+                StopReason::Next
+            }
+            RvInsn::Remu(a) => {
+                let v1 = self.gx(a.rs1);
+                let v2 = self.gx(a.rs2);
+                self.sx(a.rd, v1.wrapping_rem(v2));
+                StopReason::Next
+            }
+            RvInsn::Mulw(a) => {
+                let v1 = self.gx(a.rs1) as i32;
+                let v2 = self.gx(a.rs2) as i32;
+                self.sx(a.rd, v1.wrapping_mul(v2) as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Divw(a) => {
+                let v1 = self.gx(a.rs1) as i32;
+                let v2 = self.gx(a.rs2) as i32;
+                self.sx(a.rd, v1.wrapping_div(v2) as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Divuw(a) => {
+                let v1 = self.gx(a.rs1) as u32;
+                let v2 = self.gx(a.rs2) as u32;
+                self.sx(a.rd, v1.wrapping_div(v2) as u64);
+                StopReason::Next
+            }
+            RvInsn::Remw(a) => {
+                let v1 = self.gx(a.rs1) as i32;
+                let v2 = self.gx(a.rs2) as i32;
+                self.sx(a.rd, v1.wrapping_rem(v2) as i64 as u64);
+                StopReason::Next
+            }
+            RvInsn::Remuw(a) => {
+                let v1 = self.gx(a.rs1) as u32;
+                let v2 = self.gx(a.rs2) as u32;
+                self.sx(a.rd, v1.wrapping_rem(v2) as u64);
+                StopReason::Next
+            }
             RvInsn::LrW(_) => todo!(),
             RvInsn::ScW(_) => todo!(),
             RvInsn::AmoSwapW(_) => todo!(),
