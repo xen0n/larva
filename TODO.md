@@ -21,12 +21,6 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 ### High Priority
 
-- [ ] **Complete RV64A atomic operations** — implement all 22 `todo!()` atomics in `src/exec/interp/mod.rs`
-
-  - `LrW`, `ScW`, all `Amo*W` variants
-  - `LrD`, `ScD`, all `Amo*D` variants
-  - See `docs/design.md` for LoongArch correspondence
-
 - [ ] **Complete RVF (float) operations** — implement ~25 `todo!()` float ops
 
   - Arithmetic: `FaddS`, `FsubS`, `FmulS`, `FdivS`, `FsqrtS`
@@ -89,3 +83,4 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 - [x] Fix all clippy warnings
 - [x] Add CI workflow — GitHub Actions for build, test, clippy
 - [x] Fix MMU bugs — g2h() and align_to_page() fixes
+- [x] RV64A atomic operations — LR, SC, AMOSWAP, AMOADD, AMOXOR, AMOAND, AMOOR, AMOMIN, AMOMAX, AMOMINU, AMOMAXU (32/64-bit variants)
