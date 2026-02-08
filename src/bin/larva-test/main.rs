@@ -34,9 +34,9 @@ fn main() {
     executor.stack(4096).unwrap();
 
     let block_addr = mem.as_ptr() as u64;
-    let entry_pc = block_addr + 0;
-    println!("code addr = {:016x}", block_addr);
-    println!(" entry pc = {:016x}", entry_pc);
+    let entry_pc = block_addr;
+    println!("code addr = {block_addr:016x}");
+    println!(" entry pc = {entry_pc:016x}");
     let exit_reason = executor.exec(entry_pc);
-    println!("exit_reason = {:?}", exit_reason);
+    println!("exit_reason = {exit_reason:?}");
 }
