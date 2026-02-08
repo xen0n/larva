@@ -15,7 +15,7 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 | Task | Assigned To | PR/Branch | Started |
 |------|-------------|-----------|---------|
-| *(none)* | — | — | — |
+| RVD double ops | @openclaw | #13 / feat/rvd-double | 2026-02-08 |
 
 ## Current Tasks
 
