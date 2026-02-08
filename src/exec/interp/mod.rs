@@ -74,6 +74,54 @@ fn classify_float(val: f32) -> u64 {
     }
 }
 
+/// Classify a double value according to RISC-V FCLASS format.
+/// Returns a bit mask where bit N is set if the value matches class N.
+fn classify_double(val: f64) -> u64 {
+    let bits = val.to_bits();
+    let sign = bits >> 63;
+    let exp = (bits >> 52) & 0x7FF;
+    let mant = bits & 0xF_FFFF_FFFF_FFFFu64;
+
+    if exp == 0 && mant == 0 {
+        // Zero
+        if sign == 0 {
+            1 << 4 // +0
+        } else {
+            1 << 3 // -0
+        }
+    } else if exp == 0 {
+        // Subnormal
+        if sign == 0 {
+            1 << 5 // +subnormal
+        } else {
+            1 << 2 // -subnormal
+        }
+    } else if exp == 0x7FF {
+        if mant == 0 {
+            // Infinity
+            if sign == 0 {
+                1 << 7 // +inf
+            } else {
+                1 << 0 // -inf
+            }
+        } else {
+            // NaN
+            if mant & 0x8_0000_0000_0000u64 != 0 {
+                1 << 9 // quiet NaN
+            } else {
+                1 << 8 // signaling NaN
+            }
+        }
+    } else {
+        // Normal
+        if sign == 0 {
+            1 << 6 // +normal
+        } else {
+            1 << 1 // -normal
+        }
+    }
+}
+
 impl<'a> RvInterpreterExecutor<'a> {
     pub fn new(xlen: usize, state: &'a mut RvIsaState, mmu: &'a mut GuestMmu) -> Self {
         Self {
@@ -1079,32 +1127,171 @@ impl<'a> RvInterpreterExecutor<'a> {
                     .err()
                     .unwrap_or(StopReason::Next)
             }
-            RvInsn::FmaddD(_) => todo!(),
-            RvInsn::FmsubD(_) => todo!(),
-            RvInsn::FnmsubD(_) => todo!(),
-            RvInsn::FnmaddD(_) => todo!(),
-            RvInsn::FaddD(_) => todo!(),
-            RvInsn::FsubD(_) => todo!(),
-            RvInsn::FmulD(_) => todo!(),
-            RvInsn::FdivD(_) => todo!(),
-            RvInsn::FsqrtD(_) => todo!(),
-            RvInsn::FsgnjD(_) => todo!(),
-            RvInsn::FsgnjnD(_) => todo!(),
-            RvInsn::FsgnjxD(_) => todo!(),
-            RvInsn::FminD(_) => todo!(),
-            RvInsn::FmaxD(_) => todo!(),
-            RvInsn::FcvtSD(_) => todo!(),
-            RvInsn::FcvtDS(_) => todo!(),
-            RvInsn::FeqD(_) => todo!(),
-            RvInsn::FltD(_) => todo!(),
-            RvInsn::FleD(_) => todo!(),
-            RvInsn::FclassD(_) => todo!(),
-            RvInsn::FcvtWD(_) => todo!(),
-            RvInsn::FcvtWuD(_) => todo!(),
-            RvInsn::FcvtDW(_) => todo!(),
-            RvInsn::FcvtDWu(_) => todo!(),
-            RvInsn::FcvtLD(_) => todo!(),
-            RvInsn::FcvtLuD(_) => todo!(),
+            // RVD double-precision floating-point operations
+            // Note: Like RVF, these assume IEEE 754-2008 with nan2008 semantics
+            RvInsn::FmaddD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let rs3 = self.gf64(a.rs3);
+                self.sf64(a.rd, rs1.mul_add(rs2, rs3));
+                StopReason::Next
+            }
+            RvInsn::FmsubD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let rs3 = self.gf64(a.rs3);
+                self.sf64(a.rd, rs1.mul_add(rs2, -rs3));
+                StopReason::Next
+            }
+            RvInsn::FnmsubD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let rs3 = self.gf64(a.rs3);
+                self.sf64(a.rd, -(rs1.mul_add(rs2, -rs3)));
+                StopReason::Next
+            }
+            RvInsn::FnmaddD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let rs3 = self.gf64(a.rs3);
+                self.sf64(a.rd, -(rs1.mul_add(rs2, rs3)));
+                StopReason::Next
+            }
+            RvInsn::FaddD(a) => {
+                let v = self.gf64(a.rs1) + self.gf64(a.rs2);
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FsubD(a) => {
+                let v = self.gf64(a.rs1) - self.gf64(a.rs2);
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FmulD(a) => {
+                let v = self.gf64(a.rs1) * self.gf64(a.rs2);
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FdivD(a) => {
+                let v = self.gf64(a.rs1) / self.gf64(a.rs2);
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FsqrtD(a) => {
+                let v = self.gf64(a.rs1).sqrt();
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FsgnjD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let sign = rs2.to_bits() & 0x8000_0000_0000_0000u64;
+                let val = f64::from_bits((rs1.to_bits() & 0x7FFF_FFFF_FFFF_FFFFu64) | sign);
+                self.sf64(a.rd, val);
+                StopReason::Next
+            }
+            RvInsn::FsgnjnD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let sign = (rs2.to_bits() & 0x8000_0000_0000_0000u64) ^ 0x8000_0000_0000_0000u64;
+                let val = f64::from_bits((rs1.to_bits() & 0x7FFF_FFFF_FFFF_FFFFu64) | sign);
+                self.sf64(a.rd, val);
+                StopReason::Next
+            }
+            RvInsn::FsgnjxD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                let sign = (rs1.to_bits() & 0x8000_0000_0000_0000u64)
+                    ^ (rs2.to_bits() & 0x8000_0000_0000_0000u64);
+                let val = f64::from_bits((rs1.to_bits() & 0x7FFF_FFFF_FFFF_FFFFu64) | sign);
+                self.sf64(a.rd, val);
+                StopReason::Next
+            }
+            RvInsn::FminD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                self.sf64(a.rd, rs1.min(rs2));
+                StopReason::Next
+            }
+            RvInsn::FmaxD(a) => {
+                let rs1 = self.gf64(a.rs1);
+                let rs2 = self.gf64(a.rs2);
+                self.sf64(a.rd, rs1.max(rs2));
+                StopReason::Next
+            }
+            RvInsn::FcvtSD(a) => {
+                let v = self.gf64(a.rs1) as f32;
+                self.sf32(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FcvtDS(a) => {
+                let v = self.gf32(a.rs1) as f64;
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FeqD(a) => {
+                let v = if self.gf64(a.rs1) == self.gf64(a.rs2) {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FltD(a) => {
+                let v = if self.gf64(a.rs1) < self.gf64(a.rs2) {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FleD(a) => {
+                let v = if self.gf64(a.rs1) <= self.gf64(a.rs2) {
+                    1
+                } else {
+                    0
+                };
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FclassD(a) => {
+                let val = self.gf64(a.rs1);
+                let class = classify_double(val);
+                self.sx(a.rd, class);
+                StopReason::Next
+            }
+            RvInsn::FcvtWD(a) => {
+                let v = self.gf64(a.rs1) as i32 as i64 as u64;
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FcvtWuD(a) => {
+                let v = self.gf64(a.rs1) as u32 as u64;
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FcvtDW(a) => {
+                let v = self.gx(a.rs1) as i32 as f64;
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FcvtDWu(a) => {
+                let v = self.gx(a.rs1) as u32 as f64;
+                self.sf64(a.rd, v);
+                StopReason::Next
+            }
+            RvInsn::FcvtLD(a) => {
+                let v = self.gf64(a.rs1) as i64;
+                self.sx(a.rd, v as u64);
+                StopReason::Next
+            }
+            RvInsn::FcvtLuD(a) => {
+                let v = self.gf64(a.rs1) as u64;
+                self.sx(a.rd, v);
+                StopReason::Next
+            }
             RvInsn::FmvXD(a) => {
                 self.sx(a.rd, self.gf64(a.rs1) as u64);
                 StopReason::Next
@@ -1145,5 +1332,28 @@ mod tests {
         // NaN - assumes nan2008 semantics (Loongson 3A4000+ compatible)
         // Legacy MIPS implementations may differ in NaN signaling behavior
         assert_eq!(classify_float(f32::NAN), 1 << 9); // quiet NaN (most NaNs are quiet)
+    }
+
+    #[test]
+    fn test_classify_double() {
+        // Zero
+        assert_eq!(classify_double(0.0), 1 << 4); // +0
+        assert_eq!(classify_double(-0.0), 1 << 3); // -0
+
+        // Infinity
+        assert_eq!(classify_double(f64::INFINITY), 1 << 7); // +inf
+        assert_eq!(classify_double(f64::NEG_INFINITY), 1 << 0); // -inf
+
+        // Normal numbers
+        assert_eq!(classify_double(1.0), 1 << 6); // +normal
+        assert_eq!(classify_double(-1.0), 1 << 1); // -normal
+
+        // Subnormal
+        let subnormal = f64::from_bits(0x0000000000000001u64);
+        assert_eq!(classify_double(subnormal), 1 << 5); // +subnormal
+        assert_eq!(classify_double(-subnormal), 1 << 2); // -subnormal
+
+        // NaN - assumes nan2008 semantics
+        assert_eq!(classify_double(f64::NAN), 1 << 9); // quiet NaN
     }
 }
