@@ -21,6 +21,8 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 ### High Priority
 
+- [ ] **Add CI workflow** — GitHub Actions for build, test, clippy
+
 - [ ] **Complete RV64A atomic operations** — implement all 22 `todo!()` atomics in `src/exec/interp/mod.rs`
   - `LrW`, `ScW`, all `Amo*W` variants
   - `LrD`, `ScD`, all `Amo*D` variants
@@ -57,7 +59,6 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 ### Low Priority
 
-- [ ] **Add CI workflow** — GitHub Actions for build, test, clippy
 - [ ] **Implement FenceI** — instruction fence for self-modifying code
 - [ ] **Improve error handling** — replace more `unwrap()` with proper errors
 - [ ] **Documentation** — add module-level docs to `src/exec/`
