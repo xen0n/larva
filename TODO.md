@@ -15,7 +15,7 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 | Task | Assigned To | PR/Branch | Started |
 |------|-------------|-----------|---------|
-| RVD double ops | @openclaw | #13 / feat/rvd-double | 2026-02-08 |
+| *(none)* | — | — | — |
 
 ## Current Tasks
 
@@ -85,3 +85,4 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 - [x] Fix MMU bugs — g2h() and align_to_page() fixes
 - [x] RV64A atomic operations — LR, SC, AMOSWAP, AMOADD, AMOXOR, AMOAND, AMOOR, AMOMIN, AMOMAX, AMOMINU, AMOMAXU (32/64-bit variants)
 - [x] RVF float operations — FADD, FSUB, FMUL, FDIV, FSQRT, FMADD, FMSUB, FNMADD, FNMSUB, FSGNJ, FMIN, FMAX, FCVT, FEQ, FLT, FLE, FCLASS
+- [x] RVD double operations — FADD, FSUB, FMUL, FDIV, FSQRT, FMADD, FMSUB, FNMADD, FNMSUB, FSGNJ, FMIN, FMAX, FCVT, FEQ, FLT, FLE, FCLASS (double-precision variants)
