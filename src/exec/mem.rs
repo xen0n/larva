@@ -74,10 +74,10 @@ fn get_page_shift(page_size: usize) -> usize {
 }
 
 fn align_to_page(len: usize, page_size: usize, page_shift: usize) -> usize {
-    if len % page_size == 0 {
+    if len.is_multiple_of(page_size) {
         len
     } else {
-        (len >> page_shift + 1) << page_shift
+        (len >> (page_shift + 1)) << page_shift
     }
 }
 
