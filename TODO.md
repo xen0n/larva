@@ -15,7 +15,7 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 | Task | Assigned To | PR/Branch | Started |
 |------|-------------|-----------|---------|
-| *(none)* | — | — | — |
+| RV64A atomics | @openclaw | #9 / feat/rv64a-atomics | 2026-02-08 |
 
 ## Current Tasks
 

@@ -37,6 +37,48 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
     }
 
+    /// Perform an atomic read-modify-write operation on a 32-bit memory location.
+    /// The `op` closure receives the old value and returns the new value.
+    fn amo_32<F>(&mut self, addr: GuestAddr, rd: u8, op: F) -> StopReason
+    where
+        F: FnOnce(u32) -> u32,
+    {
+        match self.get_u32(addr) {
+            Ok(old) => {
+                let new_val = op(old);
+                match self.set_u32(addr, new_val) {
+                    Ok(_) => {
+                        self.sx(rd, sext_u32(old));
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
+    /// Perform an atomic read-modify-write operation on a 64-bit memory location.
+    /// The `op` closure receives the old value and returns the new value.
+    fn amo_64<F>(&mut self, addr: GuestAddr, rd: u8, op: F) -> StopReason
+    where
+        F: FnOnce(u64) -> u64,
+    {
+        match self.get_u64(addr) {
+            Ok(old) => {
+                let new_val = op(old);
+                match self.set_u64(addr, new_val) {
+                    Ok(_) => {
+                        self.sx(rd, old);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            Err(e) => e,
+        }
+    }
+
     pub fn debug(&mut self, val: bool) {
         self.debug = val;
     }
@@ -641,28 +683,148 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.sx(a.rd, v1.wrapping_rem(v2) as u64);
                 StopReason::Next
             }
-            RvInsn::LrW(_) => todo!(),
-            RvInsn::ScW(_) => todo!(),
-            RvInsn::AmoSwapW(_) => todo!(),
-            RvInsn::AmoAddW(_) => todo!(),
-            RvInsn::AmoXorW(_) => todo!(),
-            RvInsn::AmoAndW(_) => todo!(),
-            RvInsn::AmoOrW(_) => todo!(),
-            RvInsn::AmoMinW(_) => todo!(),
-            RvInsn::AmoMaxW(_) => todo!(),
-            RvInsn::AmoMinuW(_) => todo!(),
-            RvInsn::AmoMaxuW(_) => todo!(),
-            RvInsn::LrD(_) => todo!(),
-            RvInsn::ScD(_) => todo!(),
-            RvInsn::AmoSwapD(_) => todo!(),
-            RvInsn::AmoAddD(_) => todo!(),
-            RvInsn::AmoXorD(_) => todo!(),
-            RvInsn::AmoAndD(_) => todo!(),
-            RvInsn::AmoOrD(_) => todo!(),
-            RvInsn::AmoMinD(_) => todo!(),
-            RvInsn::AmoMaxD(_) => todo!(),
-            RvInsn::AmoMinuD(_) => todo!(),
-            RvInsn::AmoMaxuD(_) => todo!(),
+            // RV32A/RV64A atomic operations
+            //
+            // These are implemented as non-atomic read-modify-write sequences
+            // because the interpreter is single-threaded. In a multi-threaded
+            // context, these would need proper atomic synchronization.
+            //
+            // LR/SC (Load-Reserved/Store-Conditional) pairs are not tracked;
+            // SC always succeeds (returns 0) in this implementation.
+            RvInsn::LrW(a) => {
+                let addr = self.gx(a.rs1);
+                match self.get_u32(addr.into()) {
+                    Ok(v) => {
+                        self.sx(a.rd, sext_u32(v));
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            RvInsn::ScW(a) => {
+                let addr = self.gx(a.rs1);
+                let val = self.gx(a.rs2) as u32;
+                match self.set_u32(addr.into(), val) {
+                    Ok(_) => {
+                        self.sx(a.rd, 0);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            // AMO operations: atomic read-modify-write
+            // Each operation follows the pattern: load, compute, store, return old value
+            RvInsn::AmoSwapW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let new_val = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |_old| new_val)
+            }
+            RvInsn::AmoAddW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old.wrapping_add(rs2))
+            }
+            RvInsn::AmoXorW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old ^ rs2)
+            }
+            RvInsn::AmoAndW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old & rs2)
+            }
+            RvInsn::AmoOrW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old | rs2)
+            }
+            RvInsn::AmoMinW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as i32;
+                self.amo_32(addr, a.rd, |old| (old as i32).min(rs2) as u32)
+            }
+            RvInsn::AmoMaxW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as i32;
+                self.amo_32(addr, a.rd, |old| (old as i32).max(rs2) as u32)
+            }
+            RvInsn::AmoMinuW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old.min(rs2))
+            }
+            RvInsn::AmoMaxuW(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as u32;
+                self.amo_32(addr, a.rd, |old| old.max(rs2))
+            }
+            RvInsn::LrD(a) => {
+                let addr = self.gx(a.rs1);
+                match self.get_u64(addr.into()) {
+                    Ok(v) => {
+                        self.sx(a.rd, v);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            RvInsn::ScD(a) => {
+                let addr = self.gx(a.rs1);
+                let val = self.gx(a.rs2);
+                match self.set_u64(addr.into(), val) {
+                    Ok(_) => {
+                        self.sx(a.rd, 0);
+                        StopReason::Next
+                    }
+                    Err(e) => e,
+                }
+            }
+            RvInsn::AmoSwapD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let new_val = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |_old| new_val)
+            }
+            RvInsn::AmoAddD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old.wrapping_add(rs2))
+            }
+            RvInsn::AmoXorD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old ^ rs2)
+            }
+            RvInsn::AmoAndD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old & rs2)
+            }
+            RvInsn::AmoOrD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old | rs2)
+            }
+            RvInsn::AmoMinD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as i64;
+                self.amo_64(addr, a.rd, |old| (old as i64).min(rs2) as u64)
+            }
+            RvInsn::AmoMaxD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2) as i64;
+                self.amo_64(addr, a.rd, |old| (old as i64).max(rs2) as u64)
+            }
+            RvInsn::AmoMinuD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old.min(rs2))
+            }
+            RvInsn::AmoMaxuD(a) => {
+                let addr = self.gx(a.rs1).into();
+                let rs2 = self.gx(a.rs2);
+                self.amo_64(addr, a.rd, |old| old.max(rs2))
+            }
             RvInsn::Flw(a) => {
                 let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
                 match self.get_u32(addr.into()) {
