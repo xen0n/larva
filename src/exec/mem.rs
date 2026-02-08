@@ -230,7 +230,10 @@ mod tests {
 
         // g2h should return a valid host address
         let haddr = mmu.g2h(gaddr);
-        assert!(haddr.is_some(), "g2h should return Some for allocated memory");
+        assert!(
+            haddr.is_some(),
+            "g2h should return Some for allocated memory"
+        );
 
         // For mmap blocks, the guest address IS the mmap pointer (at offset 0),
         // so g2h returns the same value. What matters is that g2h correctly
@@ -239,7 +242,11 @@ mod tests {
         // The host address should be valid (non-zero and properly aligned)
         assert!(haddr.as_u64() != 0, "Host address should be non-zero");
         // And it should be page-aligned
-        assert_eq!(haddr.as_u64() % 4096, 0, "Host address should be page-aligned");
+        assert_eq!(
+            haddr.as_u64() % 4096,
+            0,
+            "Host address should be page-aligned"
+        );
     }
 
     #[test]
