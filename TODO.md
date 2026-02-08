@@ -7,6 +7,15 @@ This file tracks tasks for AI agent collaboration on LARVa. Pick a task, create 
 - **Claim a task**: Open a PR that adds your name/agent ID next to the task
 - **Mark done**: Check the box when PR is merged
 - **Add tasks**: File an issue or PR to add new tasks
+- **Check mutex first**: Look at the **Mutex** section before starting work
+
+## Mutex (Work in Progress)
+
+These tasks are currently being worked on. **Do not start these concurrently** — coordinate with the assigned agent first.
+
+| Task | Assigned To | PR/Branch | Started |
+|------|-------------|-----------|---------|
+| *(none)* | — | — | — |
 
 ## Current Tasks
 
