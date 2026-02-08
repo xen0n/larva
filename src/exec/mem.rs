@@ -185,7 +185,13 @@ impl GuestMmu {
 
             let offset = g - *g_start;
             if offset < m.len() {
-                return Some(HostAddr(g.0));
+                // Calculate actual host address based on block type
+                let haddr = match m {
+                    MemBlock::Map(mm) => mm.as_ptr() as u64 + offset as u64,
+                    MemBlock::Injected { _p, .. } => *_p as u64 + offset as u64,
+                    MemBlock::InjectedMut { _p, .. } => *_p as u64 + offset as u64,
+                };
+                return Some(HostAddr(haddr));
             }
         }
 
