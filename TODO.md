@@ -15,7 +15,7 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 | Task | Assigned To | PR/Branch | Started |
 |------|-------------|-----------|---------|
-| Fix MMU bugs | @openclaw | #10 / fix-mmu-bugs | 2026-02-08 |
+| *(none)* | — | — | — |
 
 ## Current Tasks
 
@@ -88,3 +88,4 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 - [x] Update deps and Rust 2024 edition
 - [x] Fix all clippy warnings
 - [x] Add CI workflow — GitHub Actions for build, test, clippy
+- [x] Fix MMU bugs — g2h() and align_to_page() fixes
