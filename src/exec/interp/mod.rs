@@ -94,7 +94,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u8(&self, gaddr: GuestAddr, val: u8) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u8).write(val) })
+            unsafe { (haddr.as_u64() as *mut u8).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -105,7 +106,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u16(&self, gaddr: GuestAddr, val: u16) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u16).write(val) })
+            unsafe { (haddr.as_u64() as *mut u16).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -116,7 +118,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u32(&self, gaddr: GuestAddr, val: u32) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u32).write(val) })
+            unsafe { (haddr.as_u64() as *mut u32).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -127,7 +130,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u64(&self, gaddr: GuestAddr, val: u64) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u64).write(val) })
+            unsafe { (haddr.as_u64() as *mut u64).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
