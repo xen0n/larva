@@ -515,7 +515,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Addiw(a) => {
-                let v = self.gx(a.rs1) as i32 + a.imm as i32;
+                let v = self.gx(a.rs1) as i32 + a.imm;
                 self.sx(a.rd, v as i64 as u64);
                 StopReason::Next
             }
@@ -574,7 +574,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Mulhsu(a) => {
                 let v1 = self.gx(a.rs1) as i64 as i128;
-                let v2 = self.gx(a.rs1) as u64 as i128;
+                let v2 = self.gx(a.rs1) as i128;
                 let v = (v1 * v2) >> 64;
                 self.sx(a.rd, v as u64);
                 StopReason::Next
