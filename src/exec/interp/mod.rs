@@ -184,7 +184,7 @@ impl<'a> RvInterpreterExecutor<'a> {
     fn fetch_insn(&self) -> Result<(RvInsn, usize), StopReason> {
         let pc = self.state.get_pc();
         if self.debug {
-            println!("pc = {:016x}", pc);
+            println!("pc = {pc:016x}");
         }
 
         // XXX: this is duplicating code from decoder, ideally decoder will
@@ -207,7 +207,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             Err(e) => return e,
         };
         if self.debug {
-            println!("decoded {}b: {:?}", len, insn);
+            println!("decoded {len}b: {insn:?}");
         }
 
         let res = self.interpret_one(&insn, len);
