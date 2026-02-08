@@ -82,6 +82,29 @@ The interpreter returns `StopReason` after each instruction:
 - Use `todo!()` for unimplemented cases (mark with issue reference if known)
 - Keep `unsafe` blocks minimal and documented with safety comments
 
+### Large-scale changes
+
+When making large-scale changes (e.g., fixing clippy warnings, refactoring, formatting), **split into logical, atomic commits** rather than one big commit:
+
+- **One logical change per commit** — if the change touches multiple independent aspects, split them
+- **Group by concern** — e.g., one commit per lint type, one commit per module refactor
+- **Avoid mixing** — don't combine formatting fixes with logic changes
+
+Examples:
+```bash
+# Good: fixing multiple clippy warnings
+# Commit 1: fix precedence warnings in mem.rs
+# Commit 2: fix redundant-field-names in mem.rs
+# Commit 3: fix uninlined-format-args across all files
+
+# Good: refactoring
+# Commit 1: extract helper functions in module A
+# Commit 2: extract helper functions in module B
+# Commit 3: update call sites
+```
+
+This makes reviews easier, history more meaningful, and allows selective reverts.
+
 ## Commit message style
 
 Follow Conventional Commits:
