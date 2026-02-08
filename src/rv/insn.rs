@@ -205,16 +205,14 @@ impl RvDecoder {
                 let insn = (mem[1] as u16) << 8 | (mem[0] as u16);
                 Some((self.rvc.disas(insn).into(), 2))
             }
+        } else if mem.len() < 4 {
+            None
         } else {
-            if mem.len() < 4 {
-                None
-            } else {
-                let insn = (mem[3] as u32) << 24
-                    | (mem[2] as u32) << 16
-                    | (mem[1] as u32) << 8
-                    | (mem[0] as u32);
-                Some((disas_32bit(insn), 4))
-            }
+            let insn = (mem[3] as u32) << 24
+                | (mem[2] as u32) << 16
+                | (mem[1] as u32) << 8
+                | (mem[0] as u32);
+            Some((disas_32bit(insn), 4))
         }
     }
 

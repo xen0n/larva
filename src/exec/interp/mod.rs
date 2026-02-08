@@ -94,7 +94,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u8(&self, gaddr: GuestAddr, val: u8) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u8).write(val) })
+            unsafe { (haddr.as_u64() as *mut u8).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -105,7 +106,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u16(&self, gaddr: GuestAddr, val: u16) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u16).write(val) })
+            unsafe { (haddr.as_u64() as *mut u16).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -116,7 +118,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u32(&self, gaddr: GuestAddr, val: u32) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u32).write(val) })
+            unsafe { (haddr.as_u64() as *mut u32).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -127,7 +130,8 @@ impl<'a> RvInterpreterExecutor<'a> {
 
     fn set_u64(&self, gaddr: GuestAddr, val: u64) -> Result<(), StopReason> {
         if let Some(haddr) = self.mmu.g2h(gaddr) {
-            Ok(unsafe { (haddr.as_u64() as *mut u64).write(val) })
+            unsafe { (haddr.as_u64() as *mut u64).write(val) };
+            Ok(())
         } else {
             Err(StopReason::Segv {
                 read: false,
@@ -180,7 +184,7 @@ impl<'a> RvInterpreterExecutor<'a> {
     fn fetch_insn(&self) -> Result<(RvInsn, usize), StopReason> {
         let pc = self.state.get_pc();
         if self.debug {
-            println!("pc = {:016x}", pc);
+            println!("pc = {pc:016x}");
         }
 
         // XXX: this is duplicating code from decoder, ideally decoder will
@@ -203,7 +207,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             Err(e) => return e,
         };
         if self.debug {
-            println!("decoded {}b: {:?}", len, insn);
+            println!("decoded {len}b: {insn:?}");
         }
 
         let res = self.interpret_one(&insn, len);
@@ -511,7 +515,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                     .unwrap_or(StopReason::Next)
             }
             RvInsn::Addiw(a) => {
-                let v = self.gx(a.rs1) as i32 + a.imm as i32;
+                let v = self.gx(a.rs1) as i32 + a.imm;
                 self.sx(a.rd, v as i64 as u64);
                 StopReason::Next
             }
@@ -570,7 +574,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Mulhsu(a) => {
                 let v1 = self.gx(a.rs1) as i64 as i128;
-                let v2 = self.gx(a.rs1) as u64 as i128;
+                let v2 = self.gx(a.rs1) as i128;
                 let v = (v1 * v2) >> 64;
                 self.sx(a.rd, v as u64);
                 StopReason::Next
