@@ -14,8 +14,7 @@ impl<'a> RvInterpreterExecutor<'a> {
 
         if self.debug {
             println!(
-                "syscall: {} ({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
-                nr, arg0, arg1, arg2, arg3, arg4, arg5
+                "syscall: {nr} ({arg0:#x}, {arg1:#x}, {arg2:#x}, {arg3:#x}, {arg4:#x}, {arg5:#x})"
             );
         }
         match nr {
@@ -25,8 +24,7 @@ impl<'a> RvInterpreterExecutor<'a> {
 
             _ => {
                 println!(
-                    "unimplemented syscall: {} ({:#x}, {:#x}, {:#x}, {:#x}, {:#x}, {:#x})",
-                    nr, arg0, arg1, arg2, arg3, arg4, arg5
+                    "unimplemented syscall: {nr} ({arg0:#x}, {arg1:#x}, {arg2:#x}, {arg3:#x}, {arg4:#x}, {arg5:#x})"
                 );
                 self.state.set_x(10, u64::wrapping_neg(38)); // -ENOSYS
                 StopReason::Next
