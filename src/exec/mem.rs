@@ -118,7 +118,7 @@ impl GuestMmu {
     }
 
     pub fn consume_host(&mut self, mem: *const u8, len: usize) -> ::std::io::Result<GuestAddr> {
-        let m = MemBlock::Injected { _p: mem, len: len };
+        let m = MemBlock::Injected { _p: mem, len };
         let addr = mem as u64;
 
         let mut maps = self.maps.write().unwrap();
@@ -128,7 +128,7 @@ impl GuestMmu {
     }
 
     pub fn consume_host_mut(&mut self, mem: *mut u8, len: usize) -> ::std::io::Result<GuestAddr> {
-        let m = MemBlock::InjectedMut { _p: mem, len: len };
+        let m = MemBlock::InjectedMut { _p: mem, len };
         let addr = mem as u64;
 
         let mut maps = self.maps.write().unwrap();
