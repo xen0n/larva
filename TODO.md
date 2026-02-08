@@ -24,23 +24,27 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 - [ ] **Add CI workflow** — GitHub Actions for build, test, clippy
 
 - [ ] **Complete RV64A atomic operations** — implement all 22 `todo!()` atomics in `src/exec/interp/mod.rs`
+
   - `LrW`, `ScW`, all `Amo*W` variants
   - `LrD`, `ScD`, all `Amo*D` variants
   - See `docs/design.md` for LoongArch correspondence
 
 - [ ] **Complete RVF (float) operations** — implement ~25 `todo!()` float ops
+
   - Arithmetic: `FaddS`, `FsubS`, `FmulS`, `FdivS`, `FsqrtS`
   - Comparisons: `FeqS`, `FltS`, `FleS`, `FclassS`
   - Conversions: `Fcvt*S` variants
   - See `docs/design.md` for missing correspondences
 
 - [ ] **Complete RVD (double) operations** — implement ~25 `todo!()` double ops
+
   - Same structure as RVF
   - `FmaddD`, `FmsubD`, etc.
 
 ### Medium Priority
 
 - [ ] **Expand syscall coverage** — add syscalls for running real programs
+
   - [ ] `read` — needed for stdin
   - [ ] `openat` / `open` — file opening
   - [ ] `mmap` / `munmap` — memory mapping
@@ -49,10 +53,12 @@ These tasks are currently being worked on. **Do not start these concurrently** �
   - Target: run a simple static binary (e.g., `busybox`)
 
 - [ ] **Implement TLS (Thread-Local Storage)** — needed for multi-threaded programs
+
   - Add `tp` register to `RvIsaState`
   - Handle `fs`/`gs` segment references in syscalls
 
 - [ ] **Add proper test runner** — replace hardcoded hello-world with actual tests
+
   - Compile RISC-V test programs with `riscv64-linux-gnu-gcc -static`
   - Run and compare output against QEMU
   - Add to CI
@@ -60,17 +66,21 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 ### Low Priority
 
 - [ ] **Implement FenceI** — instruction fence for self-modifying code
+
 - [ ] **Improve error handling** — replace more `unwrap()` with proper errors
+
 - [ ] **Documentation** — add module-level docs to `src/exec/`
 
 ## Future / Research
 
 - [ ] **Binary translation prototype** — start LoongArch code generation
+
   - Research: CRanelift, LLVM, or handwritten assembly?
   - Start with simple block translation
   - Target: translate `addi` → `addi.d`
 
 - [ ] **System-level emulation** — run a minimal kernel
+
   - Requires implementing privileged mode
   - Guest MMU for virtual memory
 
