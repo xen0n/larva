@@ -77,7 +77,8 @@ fn align_to_page(len: usize, page_size: usize, page_shift: usize) -> usize {
     if len.is_multiple_of(page_size) {
         len
     } else {
-        (len >> (page_shift + 1)) << page_shift
+        // Round up to next page: ((len / page_size) + 1) * page_size
+        ((len >> page_shift) + 1) << page_shift
     }
 }
 
@@ -185,10 +186,89 @@ impl GuestMmu {
 
             let offset = g - *g_start;
             if offset < m.len() {
-                return Some(HostAddr(g.0));
+                // Calculate actual host address based on block type
+                let haddr = match m {
+                    MemBlock::Map(mm) => mm.as_ptr() as u64 + offset as u64,
+                    MemBlock::Injected { _p, .. } => *_p as u64 + offset as u64,
+                    MemBlock::InjectedMut { _p, .. } => *_p as u64 + offset as u64,
+                };
+                return Some(HostAddr(haddr));
             }
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_align_to_page() {
+        // 4K page size
+        let page_size = 4096;
+        let page_shift = 12;
+
+        // Already aligned
+        assert_eq!(align_to_page(4096, page_size, page_shift), 4096);
+        assert_eq!(align_to_page(8192, page_size, page_shift), 8192);
+
+        // Small values that need rounding up
+        assert_eq!(align_to_page(1, page_size, page_shift), 4096);
+        assert_eq!(align_to_page(4095, page_size, page_shift), 4096);
+        assert_eq!(align_to_page(4097, page_size, page_shift), 8192);
+        assert_eq!(align_to_page(5000, page_size, page_shift), 8192);
+    }
+
+    #[test]
+    fn test_g2h_with_mmap() {
+        let mut mmu = GuestMmu::new(4096);
+
+        // Allocate a page
+        let gaddr = mmu.mmap(4096, false).unwrap();
+
+        // g2h should return a valid host address
+        let haddr = mmu.g2h(gaddr);
+        assert!(
+            haddr.is_some(),
+            "g2h should return Some for allocated memory"
+        );
+
+        // For mmap blocks, the guest address IS the mmap pointer (at offset 0),
+        // so g2h returns the same value. What matters is that g2h correctly
+        // resolves to the actual mmap pointer (not just returning guest.0).
+        let haddr = haddr.unwrap();
+        // The host address should be valid (non-zero and properly aligned)
+        assert!(haddr.as_u64() != 0, "Host address should be non-zero");
+        // And it should be page-aligned
+        assert_eq!(
+            haddr.as_u64() % 4096,
+            0,
+            "Host address should be page-aligned"
+        );
+    }
+
+    #[test]
+    fn test_g2h_with_injected() {
+        let mut mmu = GuestMmu::new(4096);
+
+        // Inject host memory
+        let host_mem: [u8; 1024] = [0; 1024];
+        let gaddr = mmu.consume_host(host_mem.as_ptr(), host_mem.len()).unwrap();
+
+        // g2h should return the original pointer
+        let haddr = mmu.g2h(gaddr);
+        assert!(haddr.is_some());
+        assert_eq!(haddr.unwrap().as_u64(), host_mem.as_ptr() as u64);
+    }
+
+    #[test]
+    fn test_g2h_unmapped() {
+        let mmu = GuestMmu::new(4096);
+
+        // g2h on unmapped address should return None
+        let unmapped: GuestAddr = 0xDEADBEEFu64.into();
+        assert!(mmu.g2h(unmapped).is_none());
     }
 }

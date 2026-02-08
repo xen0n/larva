@@ -155,9 +155,35 @@ Co-authored-by: Kimi k2.5
 
 ## Testing strategy
 
-- `cargo test` for unit tests (currently minimal)
-- `cargo run --bin larva-test` for integration (must print "hello world")
-- Test against real RISC-V binaries compiled with `riscv64-linux-gnu-gcc`
+### Test types
+
+| Test | Command | Purpose | Architecture |
+|------|---------|---------|--------------|
+| Unit tests | `cargo test --lib` | Test individual functions and modules | Architecture-agnostic (Rust) |
+| Integration | `cargo run --bin larva-test` | Run hardcoded RISC-V hello-world | Runs on host, interprets RISC-V |
+| Disassembler | `cargo run --bin larva-disas <file>` | Disassemble RISC-V binaries | N/A (pure decode) |
+
+### Test architecture notes
+
+- **Interpreter tests** (`larva-test`): Architecture-agnostic — the interpreter emulates RISC-V on any host architecture (currently tested on x86_64, but should work on LoongArch, ARM, etc.)
+- **Binary translation tests**: Will be architecture-specific when implemented (require LoongArch host)
+- **CI runs**: All tests run on GitHub-hosted `ubuntu-latest` (x86_64)
+
+### Adding tests
+
+- Add unit tests in `#[cfg(test)]` modules within source files
+- For MMU, memory, and core interpreter: test with `cargo test --lib`
+- For end-to-end: extend `larva-test` or add new test binaries
+- The `larva-test` binary must output "hello world" — this is the smoke test
+
+### Testing against real RISC-V binaries
+
+Compile test programs with:
+```bash
+riscv64-linux-gnu-gcc -static -o test_prog test.c
+```
+
+Then run through the interpreter (when syscall coverage is sufficient).
 
 ## Roadmap priorities
 
@@ -170,14 +196,38 @@ See README.md for full roadmap. Current focus areas:
 
 ## TODO.md workflow
 
-Use `TODO.md` to coordinate work between agents:
+Use `TODO.md` to coordinate work between agents and prevent duplicate effort.
 
-### Before starting work
+### Proper mutex workflow
 
-1. **Check the Mutex section** — is someone already working on this?
-2. **Claim the task** — open a PR adding yourself to the Mutex table
+The correct workflow is:
 
-### Claiming a task (example)
+1. **Open an "acquire" PR first** — This PR only updates TODO.md to claim the task in the Mutex table
+2. **Work on implementation** — Push commits to the same branch
+3. **Final commit drops the mutex** — Last commit removes your entry from Mutex (or marks task Done)
+4. **Merge** — The single PR contains both the claim and the implementation
+
+### Example workflow
+
+**Step 1: Open PR to claim task**
+```bash
+git checkout -b feat/rv64a-atomics
+# Edit TODO.md: add entry to Mutex table
+git commit -m "docs(todo): claim RV64A atomics task"
+git push && gh pr create
+```
+
+**Step 2-4: Implement and finalize**
+```bash
+# ... implement features ...
+git commit -m "feat(interp): implement LR/SC instructions"
+git commit -m "feat(interp): implement AMO operations"
+# Edit TODO.md: remove from Mutex, add to Done
+git commit -m "docs(todo): mark RV64A atomics complete"
+git push
+```
+
+### Claiming a task (Mutex table format)
 
 ```markdown
 | Task | Assigned To | PR/Branch | Started |
@@ -185,16 +235,13 @@ Use `TODO.md` to coordinate work between agents:
 | RV64A atomics | @agent-name | #7 / feat/rv64a | 2026-02-08 |
 ```
 
-### When done
-
-1. Move task from Mutex to Done (or check the box in Current Tasks)
-2. Remove your entry from Mutex
-
 ### Rules
 
+- **Acquire mutex FIRST** — Open the claim PR before starting implementation
 - **One task at a time** per agent in Mutex
-- **Small, focused PRs** — if a task is large, split it into sub-tasks
-- **Don't claim without a PR** — the PR proves you're actually working on it
+- **Drop mutex in final commit** — The PR that implements the work also removes the claim
+- **Don't claim without a PR** — The PR proves you're actually working on it
+- **Small, focused PRs** — If a task is large, consider splitting into sub-tasks
 
 ## Documentation style
 
@@ -231,10 +278,34 @@ fn main() {}
 ```
 ```
 
-## Validation checklist
+## Pre-commit checklist
+
+Before committing, always run these checks:
+
+```bash
+# 1. Format check
+cargo fmt -- --check
+
+# 2. Lint check
+cargo clippy -- -D warnings
+
+# 3. Build check
+cargo build
+
+# 4. Test check (if applicable)
+cargo test --lib
+
+# 5. Run hello-world (for interpreter changes)
+cargo run --bin larva-test
+```
+
+**Fix issues before committing.** Do not commit code that fails any of these checks.
+
+## Validation checklist (for PRs)
 
 - [ ] `cargo build` compiles without errors
 - [ ] `cargo clippy -- -D warnings` is clean
 - [ ] `cargo fmt -- --check` passes
+- [ ] `cargo test --lib` passes (if tests added/modified)
 - [ ] `cargo run --bin larva-test` outputs "hello world"
 - [ ] New instructions tested with hand-crafted or compiled RISC-V code
