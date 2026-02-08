@@ -168,6 +168,69 @@ See README.md for full roadmap. Current focus areas:
 3. **Atomics**: Implement RV32A/RV64A for multi-threaded guests
 4. **Translation**: Begin LoongArch code generation (the core BT engine)
 
+## TODO.md workflow
+
+Use `TODO.md` to coordinate work between agents:
+
+### Before starting work
+
+1. **Check the Mutex section** — is someone already working on this?
+2. **Claim the task** — open a PR adding yourself to the Mutex table
+
+### Claiming a task (example)
+
+```markdown
+| Task | Assigned To | PR/Branch | Started |
+|------|-------------|-----------|---------|
+| RV64A atomics | @agent-name | #7 / feat/rv64a | 2026-02-08 |
+```
+
+### When done
+
+1. Move task from Mutex to Done (or check the box in Current Tasks)
+2. Remove your entry from Mutex
+
+### Rules
+
+- **One task at a time** per agent in Mutex
+- **Small, focused PRs** — if a task is large, split it into sub-tasks
+- **Don't claim without a PR** — the PR proves you're actually working on it
+
+## Documentation style
+
+When editing Markdown files:
+
+- **Blank line after headings** — always add a blank line after any heading (`#`, `##`, `###`, etc.)
+- **Blank line before code blocks** — always add a blank line before fenced code blocks (```)
+
+Good:
+
+```markdown
+## Section Title
+
+Text here.
+
+### Subsection
+
+More text.
+
+```rust
+fn main() {}
+```
+```
+
+Bad:
+
+```markdown
+## Section Title
+Text here.
+### Subsection
+More text.
+```rust
+fn main() {}
+```
+```
+
 ## Validation checklist
 
 - [ ] `cargo build` compiles without errors
