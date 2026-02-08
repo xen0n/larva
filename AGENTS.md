@@ -4,6 +4,7 @@ This document guides AI agents working on LARVa — a proof-of-concept RISC-V to
 
 ## Key expectations
 
+- **Check TODO.md first** — Before starting work, read `TODO.md` to see what's planned and claim tasks via the mutex workflow
 - Keep changes minimal and scoped.
 - One logical change per commit (no unrelated edits in the same commit).
 - Prefer safe, idiomatic Rust; avoid `unsafe` unless absolutely necessary.
