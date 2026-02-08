@@ -77,7 +77,8 @@ fn align_to_page(len: usize, page_size: usize, page_shift: usize) -> usize {
     if len.is_multiple_of(page_size) {
         len
     } else {
-        (len >> (page_shift + 1)) << page_shift
+        // Round up to next page: ((len / page_size) + 1) * page_size
+        ((len >> page_shift) + 1) << page_shift
     }
 }
 
