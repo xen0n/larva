@@ -25,13 +25,19 @@ chart at all, I do hope to manage the difficulty *here* somehow!
 ## Roadmap
 
 * [x] RV64GC disassembly
-* [ ] verification interpreter -- WIP
+* [x] verification interpreter -- WIP
+    * [x] RV64I -- base integer instructions
+    * [x] RV64M -- multiply/divide
+    * [x] RV64A -- atomic operations
+    * [x] RV32F/RV64F -- single-precision float
+    * [x] RV32D/RV64D -- double-precision float
+    * [ ] Zicsr -- control/status registers
 * [ ] emulation machinery
     * [x] guest MMU -- barebones
 * [ ] linux-user emulation
     * [x] stack -- works okay
     * [ ] thread-local storage
-    * [ ] syscalls -- WIP, only `exit_group` so far
+    * [ ] syscalls -- WIP, only `exit_group` and `write` so far
 * [ ] LoongArch assembly
 * [ ] translation passes
 * [ ] system level PoC

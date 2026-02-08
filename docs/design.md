@@ -131,7 +131,79 @@ LA64 correspondence.
 |`amominu_d`|`ammin.du`|
 |`amomaxu_d`|`ammax.du`|
 
-RVF and RVD correspondences: TODO
+|RV32F|Implementation|
+|:----|:---|
+|`flw`|`ld.w` + bitcast|
+|`fsw`|`st.w` + bitcast|
+|`fmadd.s`|`fmadd.d` (promote to double, compute, convert back)|
+|`fmsub.s`|`fmsub.d`|
+|`fnmsub.s`|`fnmsub.d`|
+|`fnmadd.s`|`fnmadd.d`|
+|`fadd.s`|`fadd.d`|
+|`fsub.s`|`fsub.d`|
+|`fmul.s`|`fmul.d`|
+|`fdiv.s`|`fdiv.d`|
+|`fsqrt.s`|`fsqrt.d`|
+|`fsgnj.s`|`fsgnj.d`|
+|`fsgnjn.s`|`fsgnjn.d`|
+|`fsgnjx.s`|`fsgnjx.d`|
+|`fmin.s`|`fmin.d`|
+|`fmax.s`|`fmax.d`|
+|`fcvt.w.s`|`ftintrz.w.d` + `movgr2fr.w`|
+|`fcvt.wu.s`|`ftintrz.wu.d`|
+|`fmv.x.w`|`movfr2gr.s`|
+|`feq.s`|`fcmp.ceq.d`|
+|`flt.s`|`fcmp.clt.d`|
+|`fle.s`|`fcmp.cle.d`|
+|`fclass.s`|`fclass.d`|
+|`fcvt.s.w`|`movgr2fr.w` + `ffint.s.d`|
+|`fcvt.s.wu`|`ffint.su.d`|
+|`fmv.w.x`|`movgr2fr.s`|
+
+|RV64F|Implementation|
+|:----|:---|
+|`fcvt.l.s`|`ftintrz.l.d`|
+|`fcvt.lu.s`|`ftintrz.lu.d`|
+|`fcvt.s.l`|`ffint.l.d`|
+|`fcvt.s.lu`|`ffint.lu.d`|
+
+|RV32D|Implementation|
+|:----|:---|
+|`fld`|`ld.d`|
+|`fsd`|`st.d`|
+|`fmadd.d`|`fmadd.d` (native)|
+|`fmsub.d`|`fmsub.d`|
+|`fnmsub.d`|`fnmsub.d`|
+|`fnmadd.d`|`fnmadd.d`|
+|`fadd.d`|`fadd.d`|
+|`fsub.d`|`fsub.d`|
+|`fmul.d`|`fmul.d`|
+|`fdiv.d`|`fdiv.d`|
+|`fsqrt.d`|`fsqrt.d`|
+|`fsgnj.d`|`fsgnj.d`|
+|`fsgnjn.d`|`fsgnjn.d`|
+|`fsgnjx.d`|`fsgnjx.d`|
+|`fmin.d`|`fmin.d`|
+|`fmax.d`|`fmax.d`|
+|`fcvt.s.d`|`fcvt.s.d`|
+|`fcvt.d.s`|`fcvt.d.s`|
+|`feq.d`|`fcmp.ceq.d`|
+|`flt.d`|`fcmp.clt.d`|
+|`fle.d`|`fcmp.cle.d`|
+|`fclass.d`|`fclass.d`|
+|`fcvt.w.d`|`ftintrz.w.d`|
+|`fcvt.wu.d`|`ftintrz.wu.d`|
+|`fcvt.d.w`|`ffint.d.w`|
+|`fcvt.d.wu`|`ffint.d.wu`|
+
+|RV64D|Implementation|
+|:----|:---|
+|`fcvt.l.d`|`ftintrz.l.d`|
+|`fcvt.lu.d`|`ftintrz.lu.d`|
+|`fmv.x.d`|`movfr2gr.d`|
+|`fcvt.d.l`|`ffint.d.l`|
+|`fcvt.d.lu`|`ffint.d.lu`|
+|`fmv.d.x`|`movgr2fr.d`|
 
 ## Implementation notes
 
