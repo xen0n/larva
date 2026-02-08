@@ -278,10 +278,34 @@ fn main() {}
 ```
 ```
 
-## Validation checklist
+## Pre-commit checklist
+
+Before committing, always run these checks:
+
+```bash
+# 1. Format check
+cargo fmt -- --check
+
+# 2. Lint check
+cargo clippy -- -D warnings
+
+# 3. Build check
+cargo build
+
+# 4. Test check (if applicable)
+cargo test --lib
+
+# 5. Run hello-world (for interpreter changes)
+cargo run --bin larva-test
+```
+
+**Fix issues before committing.** Do not commit code that fails any of these checks.
+
+## Validation checklist (for PRs)
 
 - [ ] `cargo build` compiles without errors
 - [ ] `cargo clippy -- -D warnings` is clean
 - [ ] `cargo fmt -- --check` passes
+- [ ] `cargo test --lib` passes (if tests added/modified)
 - [ ] `cargo run --bin larva-test` outputs "hello world"
 - [ ] New instructions tested with hand-crafted or compiled RISC-V code
