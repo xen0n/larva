@@ -36,6 +36,9 @@ jobs:
       - name: Run tests
         run: cargo test --verbose
 
+      - name: Run hello-world test
+        run: cargo run --bin larva-test
+
   clippy:
     runs-on: ubuntu-latest
     steps:
