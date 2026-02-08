@@ -177,6 +177,24 @@ Co-authored-by: Kimi k2.5
 - For end-to-end: extend `larva-test` or add new test binaries
 - The `larva-test` binary must output "hello world" — this is the smoke test
 
+### Test requirements for PRs
+
+**`feat` and `fix` commits must include tests.** This means:
+
+- New features: add unit tests demonstrating the feature works
+- Bug fixes: add a test that would have caught the bug
+- Refactors: ensure existing tests still pass
+
+Tests can be simple — the goal is verification, not exhaustive coverage. Example:
+
+```rust
+#[test]
+fn test_new_feature() {
+    let result = my_new_function(42);
+    assert_eq!(result, expected_value);
+}
+```
+
 ### Testing against real RISC-V binaries
 
 Compile test programs with:
@@ -226,6 +244,26 @@ git commit -m "feat(interp): implement AMO operations"
 # Edit TODO.md: remove from Mutex, add to Done
 git commit -m "docs(todo): mark RV64A atomics complete"
 git push
+```
+
+### Mutex dropping as HEAD commit
+
+**Important**: The mutex-dropping commit must be the **last commit (HEAD)** on the branch. This ensures:
+
+1. If the PR needs reverts, the mutex claim is automatically reverted too
+2. Clear separation between implementation and administrative changes
+3. Easy review — the final commit shows task completion
+
+**Wrong** (mutex dropped in middle):
+```
+abc123 docs(todo): drop mutex  ← not HEAD
+def456 feat: implement X
+```
+
+**Right** (mutex dropped as HEAD):
+```
+abc123 feat: implement X
+def456 docs(todo): drop mutex  ← HEAD
 ```
 
 ### Claiming a task (Mutex table format)

@@ -1114,3 +1114,31 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_classify_float() {
+        // Zero
+        assert_eq!(classify_float(0.0), 1 << 4); // +0
+        assert_eq!(classify_float(-0.0), 1 << 3); // -0
+
+        // Infinity
+        assert_eq!(classify_float(f32::INFINITY), 1 << 7); // +inf
+        assert_eq!(classify_float(f32::NEG_INFINITY), 1 << 0); // -inf
+
+        // Normal numbers
+        assert_eq!(classify_float(1.0), 1 << 6); // +normal
+        assert_eq!(classify_float(-1.0), 1 << 1); // -normal
+
+        // Subnormal
+        let subnormal = f32::from_bits(0x00000001);
+        assert_eq!(classify_float(subnormal), 1 << 5); // +subnormal
+        assert_eq!(classify_float(-subnormal), 1 << 2); // -subnormal
+
+        // NaN
+        assert_eq!(classify_float(f32::NAN), 1 << 9); // quiet NaN (most NaNs are quiet)
+    }
+}
