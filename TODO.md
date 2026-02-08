@@ -21,8 +21,6 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 
 ### High Priority
 
-- [ ] **Add CI workflow** — GitHub Actions for build, test, clippy
-
 - [ ] **Complete RV64A atomic operations** — implement all 22 `todo!()` atomics in `src/exec/interp/mod.rs`
 
   - `LrW`, `ScW`, all `Amo*W` variants
@@ -89,3 +87,4 @@ These tasks are currently being worked on. **Do not start these concurrently** �
 - [x] AGENTS.md — guide for AI agent collaboration
 - [x] Update deps and Rust 2024 edition
 - [x] Fix all clippy warnings
+- [x] Add CI workflow — GitHub Actions for build, test, clippy
