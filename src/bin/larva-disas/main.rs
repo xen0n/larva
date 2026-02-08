@@ -12,13 +12,9 @@ fn process(input_path: &str) {
 
     let d = RvDecoder::new(64);
     let mut p = 0;
-    loop {
-        if let Some((insn, size)) = d.disas(&mem[p..mem.len()]) {
-            println!("{:16x}: {:?}", p, insn);
-            p += size;
-        } else {
-            break;
-        }
+    while let Some((insn, size)) = d.disas(&mem[p..mem.len()]) {
+        println!("{p:16x}: {insn:?}");
+        p += size;
 
         if p == mem.len() {
             break;
