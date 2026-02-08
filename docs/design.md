@@ -132,3 +132,17 @@ LA64 correspondence.
 |`amomaxu_d`|`ammax.du`|
 
 RVF and RVD correspondences: TODO
+
+## Implementation notes
+
+### Floating-point
+
+The interpreter assumes the host provides IEEE 754-2008 compliant floating-point
+with nan2008 NaN signaling/quiet semantics. This is standard on modern systems
+(x86_64, ARM, Loongson 3A4000+) but legacy MIPS implementations may differ.
+
+RISC-V (and LoongArch) use nan2008 semantics where:
+- Quiet NaN has the most significant bit of the mantissa set (0x7FC00000)
+- Signaling NaN has the MSB clear (0x7F800001)
+
+Legacy MIPS used the opposite convention.

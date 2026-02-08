@@ -889,6 +889,10 @@ impl<'a> RvInterpreterExecutor<'a> {
                     .err()
                     .unwrap_or(StopReason::Next)
             }
+            // RVF floating-point operations
+            // Note: These assume the host has a conformant IEEE 754-2008 implementation
+            // with nan2008 NaN signaling/quiet semantics. Legacy MIPS implementations
+            // may behave differently.
             RvInsn::FmaddS(a) => {
                 let rs1 = self.gf32(a.rs1);
                 let rs2 = self.gf32(a.rs2);
@@ -1138,7 +1142,8 @@ mod tests {
         assert_eq!(classify_float(subnormal), 1 << 5); // +subnormal
         assert_eq!(classify_float(-subnormal), 1 << 2); // -subnormal
 
-        // NaN
+        // NaN - assumes nan2008 semantics (Loongson 3A4000+ compatible)
+        // Legacy MIPS implementations may differ in NaN signaling behavior
         assert_eq!(classify_float(f32::NAN), 1 << 9); // quiet NaN (most NaNs are quiet)
     }
 }

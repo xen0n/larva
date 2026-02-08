@@ -10,6 +10,14 @@ same name, in the rhythm game *maimai*. Binary translation is hard, running such
 logic in privileged mode is even harder; while I cannot play the *maimai*
 chart at all, I do hope to manage the difficulty *here* somehow!
 
+## Requirements
+
+- **Host architecture**: Currently developed and tested on x86_64; designed to be
+  architecture-agnostic for the interpreter
+- **Floating-point**: IEEE 754-2008 compliant implementation with nan2008 NaN
+  signaling/quiet semantics required (standard on modern systems including
+  Loongson 3A4000+, but legacy MIPS may differ)
+
 ## License
 
 [GPL-3.0-or-later](https://spdx.org/licenses/GPL-3.0-or-later.html)

@@ -18,6 +18,13 @@ This document guides AI agents working on LARVa — a proof-of-concept RISC-V to
 - **Goal**: Near-native RISC-V (RV64GC) emulation on LoongArch via binary translation
 - **License**: GPL-3.0-or-later
 
+### Platform requirements
+
+- **Host**: x86_64 for development; designed to be architecture-agnostic
+- **Floating-point**: IEEE 754-2008 with nan2008 NaN semantics required
+  - Standard on modern systems (Loongson 3A4000+, x86_64, ARM)
+  - Legacy MIPS may differ in NaN signaling behavior
+
 High-level layout:
 
 - `src/rv/`: RISC-V instruction definitions, decoding, disassembly
