@@ -47,8 +47,11 @@ const EM_RISCV: u16 = 243;
 
 const PT_LOAD: u32 = 1;
 const PT_INTERP: u32 = 3;
+#[allow(dead_code)]
 const PF_X: u32 = 1;
+#[allow(dead_code)]
 const PF_W: u32 = 2;
+#[allow(dead_code)]
 const PF_R: u32 = 4;
 
 /// Errors that can occur during ELF loading.
@@ -143,10 +146,12 @@ fn parse_ehdr(data: &[u8]) -> Result<Elf64Ehdr, ElfLoadError> {
 
     // Check endianness (little)
     if data[5] != ELFDATA2LSB {
-        return Err(ElfLoadError::Unsupported("big-endian ELF not supported".into()));
+        return Err(ElfLoadError::Unsupported(
+            "big-endian ELF not supported".into(),
+        ));
     }
 
-    let ehdr = Elf64Ehdr {
+    Ok(Elf64Ehdr {
         e_ident: data[0..16].try_into().unwrap(),
         e_type: read_u16_le(data, 16),
         e_machine: read_u16_le(data, 18),
@@ -161,14 +166,14 @@ fn parse_ehdr(data: &[u8]) -> Result<Elf64Ehdr, ElfLoadError> {
         e_shentsize: read_u16_le(data, 58),
         e_shnum: read_u16_le(data, 60),
         e_shstrndx: read_u16_le(data, 62),
-    };
-
-    Ok(ehdr)
+    })
 }
 
 fn parse_phdr(data: &[u8], offset: usize) -> Result<Elf64Phdr, ElfLoadError> {
     if data.len() < offset + 56 {
-        return Err(ElfLoadError::Parse("file too small for program header".into()));
+        return Err(ElfLoadError::Parse(
+            "file too small for program header".into(),
+        ));
     }
 
     Ok(Elf64Phdr {
@@ -202,8 +207,8 @@ pub fn load_elf_static_from_bytes(
     // Validate it's a RISC-V binary
     if ehdr.e_machine != EM_RISCV {
         return Err(ElfLoadError::Unsupported(format!(
-            "unsupported architecture: expected RISC-V ({}), got {}",
-            EM_RISCV, ehdr.e_machine
+            "unsupported architecture: expected RISC-V ({EM_RISCV}), got {}",
+            ehdr.e_machine
         )));
     }
 
@@ -245,69 +250,57 @@ pub fn load_elf_static_from_bytes(
         return Err(ElfLoadError::Parse("no PT_LOAD segments found".into()));
     }
 
-    // Find the base address (lowest vaddr)
-    let base_addr = load_segments.iter().map(|ph| ph.p_vaddr).min().unwrap();
+    // Sort segments by virtual address
+    load_segments.sort_by_key(|ph| ph.p_vaddr);
 
-    // Load each segment
+    // Find the overall range needed (merging adjacent/overlapping segments)
+    let page_size = mmu.page_size() as u64;
+    let mut min_vaddr = u64::MAX;
+    let mut max_end = 0u64;
+
     for ph in &load_segments {
-        load_segment(mmu, data, ph)?;
+        let seg_start = ph.p_vaddr;
+        let seg_end = ph.p_vaddr + ph.p_memsz;
+        min_vaddr = min_vaddr.min(seg_start);
+        max_end = max_end.max(seg_end);
     }
 
-    // Calculate end address
-    let end_addr = load_segments
-        .iter()
-        .map(|ph| ph.p_vaddr + ph.p_memsz)
-        .max()
-        .unwrap();
+    // Align to page boundaries
+    let page_offset = min_vaddr % page_size;
+    let aligned_start = min_vaddr - page_offset;
+    let aligned_end = max_end.div_ceil(page_size) * page_size;
+    let total_size = (aligned_end - aligned_start) as usize;
+
+    // Map the entire region with RWX permissions initially
+    // (we'll handle per-segment permissions properly later if needed)
+    mmu.mmap_fixed(GuestAddr(aligned_start), total_size, MemPerms::rwx(), false)
+        .map_err(ElfLoadError::Memory)?;
+
+    // Load each segment's data
+    for ph in &load_segments {
+        load_segment_data(mmu, data, ph)?;
+    }
 
     Ok(LoadedElf {
         entry: GuestAddr(ehdr.e_entry),
-        base_addr: GuestAddr(base_addr),
-        end_addr: GuestAddr(end_addr),
+        base_addr: GuestAddr(min_vaddr),
+        end_addr: GuestAddr(max_end),
         interp: None,
     })
 }
 
-/// Load a single PT_LOAD segment into guest memory.
-fn load_segment(
-    mmu: &mut GuestMmu,
-    data: &[u8],
-    ph: &Elf64Phdr,
-) -> Result<(), ElfLoadError> {
+/// Load data for a single PT_LOAD segment into an already-mapped region.
+fn load_segment_data(mmu: &mut GuestMmu, data: &[u8], ph: &Elf64Phdr) -> Result<(), ElfLoadError> {
     let vaddr = ph.p_vaddr;
     let filesz = ph.p_filesz as usize;
     let memsz = ph.p_memsz as usize;
     let offset = ph.p_offset as usize;
 
-    // Determine permissions
-    let perms = MemPerms {
-        read: ph.p_flags & PF_R != 0,
-        write: ph.p_flags & PF_W != 0,
-        exec: ph.p_flags & PF_X != 0,
-    };
-
-    // Align to page boundary
-    let page_size = mmu.page_size() as u64;
-    let page_offset = vaddr % page_size;
-    let aligned_vaddr = vaddr - page_offset;
-    let aligned_memsz = (memsz as u64 + page_offset).div_ceil(page_size) * page_size;
-
-    // Map the memory region
-    mmu.mmap_fixed(
-        GuestAddr(aligned_vaddr),
-        aligned_memsz as usize,
-        perms,
-        false,
-    )
-    .map_err(ElfLoadError::Memory)?;
-
     // Copy file data into the mapping
     if filesz > 0 {
         let gaddr = GuestAddr(vaddr);
         let haddr = mmu.g2h(gaddr).ok_or_else(|| {
-            ElfLoadError::Memory(std::io::Error::other(
-                "failed to translate guest address",
-            ))
+            ElfLoadError::Memory(std::io::Error::other("failed to translate guest address"))
         })?;
 
         // Copy the file content
@@ -323,8 +316,7 @@ fn load_segment(
 
         let gaddr = GuestAddr(bss_start);
         if let Some(haddr) = mmu.g2h(gaddr) {
-            let bss =
-                unsafe { std::slice::from_raw_parts_mut(haddr.as_mut_ptr::<u8>(), bss_size) };
+            let bss = unsafe { std::slice::from_raw_parts_mut(haddr.as_mut_ptr::<u8>(), bss_size) };
             bss.fill(0);
         }
     }
@@ -346,21 +338,21 @@ pub fn load_and_setup<P: AsRef<Path>>(
     // Load the ELF
     let elf = load_elf_static(mmu, path)?;
 
-    // Allocate stack below the loaded image
+    // Allocate stack - always use high addresses but avoid the problematic 0x7fff... range
     let stack_size = mmu.page_size().max(stack_size);
-    let stack_addr = GuestAddr(elf.base_addr.as_u64().saturating_sub(stack_size as u64));
-
-    // Ensure stack doesn't go below a reasonable minimum
-    if stack_addr.as_u64() < 0x10000 {
-        return Err(ElfLoadError::Unsupported(
-            "ELF loaded too low in address space, no room for stack".into(),
-        ));
-    }
-
+    // Use a fixed high address that's known to work
+    let stack_addr = GuestAddr(0x0000_7f00_0000_0000u64);
     mmu.mmap_fixed(stack_addr, stack_size, MemPerms::rw(), true)
         .map_err(ElfLoadError::Memory)?;
 
-    let stack_top = GuestAddr(stack_addr.as_u64() + stack_size as u64);
+    // Workaround for potential LoongArch toolchain issue with large address arithmetic
+    // Use checked_add to avoid overflow issues
+    let stack_top = GuestAddr(
+        stack_addr
+            .0
+            .checked_add(stack_size as u64)
+            .expect("stack overflow"),
+    );
 
     // TODO: Proper stack setup with argc/argv/envp
     // For now, just return the top of stack

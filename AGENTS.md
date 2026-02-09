@@ -161,6 +161,124 @@ Original prompt:
 Co-authored-by: Kimi k2.5
 ```
 
+## Debugging techniques
+
+When debugging RISC-V emulation issues, use these techniques to isolate problems:
+
+### QEMU user-mode comparison
+
+Use QEMU's user-mode emulator as a reference to understand expected behavior:
+
+```bash
+# Run with strace to see system calls
+QEMU_STRACE=1 qemu-riscv64 ./program arg1 arg2
+
+# Trace memory operations with detailed output
+qemu-riscv64 -d trace:target_mmap,trace:target_mmap_complete,trace:target_mprotect,trace:target_munmap ./program
+
+# See all trace options
+qemu-riscv64 -d help
+```
+
+### Using strace with QEMU
+
+Trace host-level system calls to understand guest behavior:
+
+```bash
+# Trace memory-related syscalls
+strace -e trace=memory,mmap,munmap,mprotect qemu-riscv64 ./program
+
+# Full syscall trace with timing
+strace -tt -T qemu-riscv64 ./program 2>&1 | head -100
+```
+
+### Interpreter debug mode
+
+Enable instruction-level tracing in the interpreter:
+
+```rust
+// In larva-run or test code:
+let mut executor = RvInterpreterExecutor::new(64, &mut state, &mut mmu);
+executor.debug(true);  // Prints each instruction before execution
+```
+
+This outputs:
+```
+pc = 00000000000101a0
+decoded 4b: Auipc(UJTypeArgs { rd: 3, imm: 32768 })
+```
+
+### Syscall debugging
+
+Add syscall tracing to identify unimplemented or misbehaving syscalls:
+
+```rust
+// In syscall.rs, the debug flag already prints:
+syscall: 64 (0x1, 0x7fffffff0020, 0xc, 0x0, 0x0, 0x0)
+// nr (arg0, arg1, arg2, ...)
+```
+
+### Memory layout debugging
+
+For MMU issues, add debug prints to trace mappings:
+
+```rust
+eprintln!("mmap_fixed: addr={:#x} len={:#x}", addr.0, len);
+eprintln!("checking {} existing regions", regions.len());
+```
+
+### Guest binary analysis
+
+Inspect RISC-V binaries to understand their layout:
+
+```bash
+# View program headers (loads, permissions)
+readelf -l ./program
+
+# View dynamic symbols (if any)
+readelf -s ./program | head -30
+
+# Check for static vs dynamic linking
+file ./program
+
+# Disassemble entry point
+riscv64-linux-gnu-objdump -d ./program | head -50
+```
+
+### Stack layout debugging
+
+Compare stack layouts between working (QEMU) and non-working runs:
+
+```bash
+# In GDB with QEMU
+qemu-riscv64 -g 1234 ./program &
+gdb-multiarch -ex "target remote :1234" -ex "x/20xg \$sp" ./program
+```
+
+### Environment variables for debugging
+
+Consider adding envvar-guarded debug output:
+
+```rust
+if std::env::var("LARVA_DEBUG").is_ok() {
+    eprintln!("MMU: mapping {:#x} len={:#x}", addr, len);
+}
+```
+
+Common patterns:
+- `LARVA_DEBUG=1` — general debug
+- `LARVA_DEBUG_SYSCALLS=1` — syscall tracing
+- `LARVA_DEBUG_MMU=1` — memory operations
+
+### Comparing with native execution
+
+For static binaries, compare register states at key points:
+
+1. Run under QEMU with GDB, break at `_start`
+2. Record register values and memory contents
+3. Compare with LARVa at same PC
+4. Divergence indicates the bug location
+
 ## Testing strategy
 
 ### Test types
