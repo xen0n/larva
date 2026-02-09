@@ -418,7 +418,7 @@ impl GuestMmu {
         perms: MemPerms,
     ) -> ::std::io::Result<GuestAddr> {
         let len_aligned = self.align_alloc_size(len);
-        
+
         // Find a free region
         let gaddr = self
             .find_free_region(len_aligned, None)
@@ -471,12 +471,11 @@ impl GuestMmu {
         let regions = self.regions.read().unwrap();
 
         // Find the region with the largest start address that is <= g
-        let candidate = regions
-            .range(..=g)
-            .next_back()
-            .map(|(_, r)| r);
+        let candidate = regions.range(..=g).next_back().map(|(_, r)| r);
 
-        if let Some(region) = candidate && region.contains(g) {
+        if let Some(region) = candidate
+            && region.contains(g)
+        {
             // Clone the region data (pointers are Copy, other fields are small)
             return Some(MemRegion {
                 guest_start: region.guest_start,
@@ -497,7 +496,13 @@ impl GuestMmu {
     }
 
     /// Translate guest address to host address with permission check.
-    pub fn g2h_with_perms(&self, g: GuestAddr, read: bool, write: bool, exec: bool) -> Option<HostAddr> {
+    pub fn g2h_with_perms(
+        &self,
+        g: GuestAddr,
+        read: bool,
+        write: bool,
+        exec: bool,
+    ) -> Option<HostAddr> {
         let region = self.find_region(g)?;
 
         if read && !region.perms.read {
@@ -601,7 +606,9 @@ mod tests {
 
         // Map at a specific address
         let target_addr = GuestAddr(0x10000);
-        let gaddr = mmu.mmap_fixed(target_addr, 4096, MemPerms::rwx(), false).unwrap();
+        let gaddr = mmu
+            .mmap_fixed(target_addr, 4096, MemPerms::rwx(), false)
+            .unwrap();
         assert_eq!(gaddr, target_addr);
 
         // g2h should work

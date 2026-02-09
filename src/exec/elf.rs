@@ -47,8 +47,11 @@ const EM_RISCV: u16 = 243;
 
 const PT_LOAD: u32 = 1;
 const PT_INTERP: u32 = 3;
+#[allow(dead_code)]
 const PF_X: u32 = 1;
+#[allow(dead_code)]
 const PF_W: u32 = 2;
+#[allow(dead_code)]
 const PF_R: u32 = 4;
 
 /// Errors that can occur during ELF loading.
@@ -168,7 +171,9 @@ fn parse_ehdr(data: &[u8]) -> Result<Elf64Ehdr, ElfLoadError> {
 
 fn parse_phdr(data: &[u8], offset: usize) -> Result<Elf64Phdr, ElfLoadError> {
     if data.len() < offset + 56 {
-        return Err(ElfLoadError::Parse("file too small for program header".into()));
+        return Err(ElfLoadError::Parse(
+            "file too small for program header".into(),
+        ));
     }
 
     Ok(Elf64Phdr {
@@ -268,13 +273,8 @@ pub fn load_elf_static_from_bytes(
 
     // Map the entire region with RWX permissions initially
     // (we'll handle per-segment permissions properly later if needed)
-    mmu.mmap_fixed(
-        GuestAddr(aligned_start),
-        total_size,
-        MemPerms::rwx(),
-        false,
-    )
-    .map_err(ElfLoadError::Memory)?;
+    mmu.mmap_fixed(GuestAddr(aligned_start), total_size, MemPerms::rwx(), false)
+        .map_err(ElfLoadError::Memory)?;
 
     // Load each segment's data
     for ph in &load_segments {
@@ -290,11 +290,7 @@ pub fn load_elf_static_from_bytes(
 }
 
 /// Load data for a single PT_LOAD segment into an already-mapped region.
-fn load_segment_data(
-    mmu: &mut GuestMmu,
-    data: &[u8],
-    ph: &Elf64Phdr,
-) -> Result<(), ElfLoadError> {
+fn load_segment_data(mmu: &mut GuestMmu, data: &[u8], ph: &Elf64Phdr) -> Result<(), ElfLoadError> {
     let vaddr = ph.p_vaddr;
     let filesz = ph.p_filesz as usize;
     let memsz = ph.p_memsz as usize;
@@ -304,9 +300,7 @@ fn load_segment_data(
     if filesz > 0 {
         let gaddr = GuestAddr(vaddr);
         let haddr = mmu.g2h(gaddr).ok_or_else(|| {
-            ElfLoadError::Memory(std::io::Error::other(
-                "failed to translate guest address",
-            ))
+            ElfLoadError::Memory(std::io::Error::other("failed to translate guest address"))
         })?;
 
         // Copy the file content
@@ -322,8 +316,7 @@ fn load_segment_data(
 
         let gaddr = GuestAddr(bss_start);
         if let Some(haddr) = mmu.g2h(gaddr) {
-            let bss =
-                unsafe { std::slice::from_raw_parts_mut(haddr.as_mut_ptr::<u8>(), bss_size) };
+            let bss = unsafe { std::slice::from_raw_parts_mut(haddr.as_mut_ptr::<u8>(), bss_size) };
             bss.fill(0);
         }
     }
@@ -354,7 +347,12 @@ pub fn load_and_setup<P: AsRef<Path>>(
 
     // Workaround for potential LoongArch toolchain issue with large address arithmetic
     // Use checked_add to avoid overflow issues
-    let stack_top = GuestAddr(stack_addr.0.checked_add(stack_size as u64).expect("stack overflow"));
+    let stack_top = GuestAddr(
+        stack_addr
+            .0
+            .checked_add(stack_size as u64)
+            .expect("stack overflow"),
+    );
 
     // TODO: Proper stack setup with argc/argv/envp
     // For now, just return the top of stack

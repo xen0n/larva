@@ -86,11 +86,11 @@ impl<'a> RvInterpreterExecutor<'a> {
 
         // Build host iovec array
         let mut host_iov: Vec<iovec> = Vec::with_capacity(iovcnt as usize);
-        
+
         unsafe {
             for i in 0..iovcnt as usize {
                 let guest_iov = &*iov_haddr.add(i);
-                
+
                 // Translate each buffer address
                 let buf_haddr = match self.mmu.g2h(GuestAddr(guest_iov.iov_base)) {
                     Some(addr) => addr.as_ptr::<u8>(),
@@ -101,7 +101,7 @@ impl<'a> RvInterpreterExecutor<'a> {
                         };
                     }
                 };
-                
+
                 host_iov.push(iovec {
                     iov_base: buf_haddr as *mut libc::c_void,
                     iov_len: guest_iov.iov_len as usize,

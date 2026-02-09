@@ -28,7 +28,9 @@ fn main() {
 
     // init MMU, map the code block
     let mut mmu = exec::mem::GuestMmu::new(4096); // RV uses 4K pages
-    let gaddr = mmu.map_host(mem.as_ptr(), mem.len(), MemPerms::rwx()).unwrap();
+    let gaddr = mmu
+        .map_host(mem.as_ptr(), mem.len(), MemPerms::rwx())
+        .unwrap();
 
     let mut executor = exec::interp::RvInterpreterExecutor::new(64, &mut state, &mut mmu);
     executor.stack(4096).unwrap();
