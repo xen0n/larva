@@ -1,25 +1,37 @@
 use std::{
-    collections::HashMap,
+    collections::BTreeMap,
     ops::{Add, Sub},
 };
 
 use memmap;
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct HostAddr(u64);
+pub struct HostAddr(pub u64);
 
 impl HostAddr {
     pub fn as_u64(&self) -> u64 {
         self.0
     }
+
+    pub fn as_ptr<T>(&self) -> *const T {
+        self.0 as *const T
+    }
+
+    pub fn as_mut_ptr<T>(&self) -> *mut T {
+        self.0 as *mut T
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
-pub struct GuestAddr(u64);
+pub struct GuestAddr(pub u64);
 
 impl GuestAddr {
     pub fn as_u64(&self) -> u64 {
         self.0
+    }
+
+    pub fn checked_add(&self, offset: usize) -> Option<Self> {
+        self.0.checked_add(offset as u64).map(Self)
     }
 }
 
@@ -48,6 +60,56 @@ impl Sub<GuestAddr> for GuestAddr {
 
     fn sub(self, rhs: GuestAddr) -> Self::Output {
         (self.0 - rhs.0) as usize
+    }
+}
+
+/// Memory permissions for a mapping.
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+pub struct MemPerms {
+    pub read: bool,
+    pub write: bool,
+    pub exec: bool,
+}
+
+impl MemPerms {
+    pub const fn none() -> Self {
+        Self {
+            read: false,
+            write: false,
+            exec: false,
+        }
+    }
+
+    pub const fn r() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: false,
+        }
+    }
+
+    pub const fn rw() -> Self {
+        Self {
+            read: true,
+            write: true,
+            exec: false,
+        }
+    }
+
+    pub const fn rx() -> Self {
+        Self {
+            read: true,
+            write: false,
+            exec: true,
+        }
+    }
+
+    pub const fn rwx() -> Self {
+        Self {
+            read: true,
+            write: true,
+            exec: true,
+        }
     }
 }
 
@@ -82,30 +144,84 @@ fn align_to_page(len: usize, page_size: usize, page_shift: usize) -> usize {
     }
 }
 
-enum MemBlock {
-    Map(memmap::MmapMut),
-    Injected { _p: *const u8, len: usize },
-    InjectedMut { _p: *mut u8, len: usize },
+#[allow(dead_code)]
+fn align_down(addr: u64, align: usize) -> u64 {
+    addr & !(align as u64 - 1)
 }
 
-impl MemBlock {
-    fn len(&self) -> usize {
-        match self {
-            MemBlock::Map(x) => x.len(),
-            MemBlock::Injected { _p: _, len } => *len,
-            MemBlock::InjectedMut { _p: _, len } => *len,
-        }
+#[allow(dead_code)]
+fn align_up(addr: u64, align: usize) -> u64 {
+    addr.div_ceil(align as u64)
+}
+
+/// A single memory mapping region.
+struct MemRegion {
+    /// Start address in guest address space
+    guest_start: GuestAddr,
+    /// Length of the mapping
+    len: usize,
+    /// Host memory backing this region
+    host_ptr: *mut u8,
+    /// Permissions
+    perms: MemPerms,
+    /// Whether this is a file-backed mapping (currently unused)
+    _file_backed: bool,
+    /// The underlying mmap (if we own it)
+    _mmap: Option<memmap::MmapMut>,
+}
+
+impl MemRegion {
+    fn contains(&self, gaddr: GuestAddr) -> bool {
+        let start = self.guest_start.as_u64();
+        let end = start + self.len as u64;
+        gaddr.as_u64() >= start && gaddr.as_u64() < end
+    }
+
+    fn offset_of(&self, gaddr: GuestAddr) -> usize {
+        gaddr - self.guest_start
+    }
+
+    fn host_addr(&self, gaddr: GuestAddr) -> HostAddr {
+        let offset = self.offset_of(gaddr);
+        HostAddr(self.host_ptr as u64 + offset as u64)
+    }
+
+    #[allow(dead_code)]
+    fn end(&self) -> GuestAddr {
+        GuestAddr(self.guest_start.as_u64() + self.len as u64)
+    }
+
+    /// Check if this region overlaps with the given range
+    fn overlaps(&self, start: GuestAddr, len: usize) -> bool {
+        let self_start = self.guest_start.as_u64();
+        let self_end = self_start + self.len as u64;
+        let other_start = start.as_u64();
+        let other_end = other_start + len as u64;
+
+        self_start < other_end && other_start < self_end
     }
 }
 
-/// Naïve implementation of an MMU.
+// Safety: MemRegion is Send/Sync if the pointer is valid and we don't
+// mutate through it concurrently. The MMU ensures exclusive access.
+unsafe impl Send for MemRegion {}
+unsafe impl Sync for MemRegion {}
+
+/// Guest Memory Management Unit.
+///
+/// Manages the mapping from guest virtual addresses to host physical addresses.
+/// Uses a BTreeMap for efficient range-based lookups.
 pub struct GuestMmu {
     guest_page_size: usize,
     guest_page_shift: usize,
     host_page_size: usize,
     host_page_shift: usize,
-    maps: std::sync::RwLock<HashMap<GuestAddr, MemBlock>>,
+    /// Maps guest start address to memory region
+    regions: std::sync::RwLock<BTreeMap<GuestAddr, MemRegion>>,
+    /// Next available address for anonymous mappings ( grows downward from high addresses)
+    next_mmap_addr: std::sync::Mutex<u64>,
 }
+
 impl GuestMmu {
     pub fn new(guest_page_size: usize) -> Self {
         let host_page_size = host_page_size();
@@ -114,89 +230,322 @@ impl GuestMmu {
             guest_page_shift: get_page_shift(guest_page_size),
             host_page_size,
             host_page_shift: get_page_shift(host_page_size),
-            maps: std::sync::RwLock::new(HashMap::new()),
+            regions: std::sync::RwLock::new(BTreeMap::new()),
+            // Start allocating from high addresses (below 2^48 for RISC-V SV39)
+            next_mmap_addr: std::sync::Mutex::new(0x7fff_ffff_0000),
         }
     }
 
-    pub fn consume_host(&mut self, mem: *const u8, len: usize) -> ::std::io::Result<GuestAddr> {
-        let m = MemBlock::Injected { _p: mem, len };
-        let addr = mem as u64;
+    /// Find a free region of at least `len` bytes.
+    fn find_free_region(&self, len: usize, hint: Option<GuestAddr>) -> Option<GuestAddr> {
+        let len = self.align_alloc_size(len);
+        let regions = self.regions.read().unwrap();
 
-        let mut maps = self.maps.write().unwrap();
-        maps.insert(addr.into(), m);
+        if let Some(hint) = hint {
+            // Try the hint address first
+            if self.is_range_free(hint, len, &regions) {
+                return Some(hint);
+            }
+        }
 
-        Ok(addr.into())
+        // Allocate from the top down
+        let mut addr = *self.next_mmap_addr.lock().unwrap();
+        loop {
+            let gaddr = GuestAddr(addr);
+            if self.is_range_free(gaddr, len, &regions) {
+                return Some(gaddr);
+            }
+            // Move down by page size
+            addr = addr.saturating_sub(len as u64);
+            if addr < 0x10000 {
+                // Don't go below 64KB
+                return None;
+            }
+        }
     }
 
-    pub fn consume_host_mut(&mut self, mem: *mut u8, len: usize) -> ::std::io::Result<GuestAddr> {
-        let m = MemBlock::InjectedMut { _p: mem, len };
-        let addr = mem as u64;
+    /// Check if a range is free (no overlapping regions).
+    fn is_range_free(
+        &self,
+        start: GuestAddr,
+        len: usize,
+        regions: &BTreeMap<GuestAddr, MemRegion>,
+    ) -> bool {
+        let start_addr = start.as_u64();
+        let end_addr = start_addr + len as u64;
 
-        let mut maps = self.maps.write().unwrap();
-        maps.insert(addr.into(), m);
+        // Check for overlap with any existing region
+        for (_, region) in regions.iter() {
+            let region_start = region.guest_start.as_u64();
+            let region_end = region_start + region.len as u64;
 
-        Ok(addr.into())
+            if start_addr < region_end && region_start < end_addr {
+                return false; // Overlap found
+            }
+        }
+        true
     }
 
-    // Naïve implementation; doesn't support fixed maps nor file-backed maps.
-    pub fn mmap(&mut self, len: usize, stack: bool) -> ::std::io::Result<GuestAddr> {
+    fn align_alloc_size(&self, len: usize) -> usize {
+        // Align to the larger of host and guest page size
+        if self.host_page_size > self.guest_page_size {
+            align_to_page(len, self.host_page_size, self.host_page_shift)
+        } else {
+            align_to_page(len, self.guest_page_size, self.guest_page_shift)
+        }
+    }
+
+    /// Create an anonymous mapping at a specific address.
+    /// Returns error if the address is already occupied.
+    pub fn mmap_fixed(
+        &mut self,
+        addr: GuestAddr,
+        len: usize,
+        perms: MemPerms,
+        stack: bool,
+    ) -> ::std::io::Result<GuestAddr> {
         if len == 0 {
             return Err(std::io::ErrorKind::InvalidInput.into());
         }
 
-        // align to host page only if host page size is bigger than guest's,
-        // else align to guest page
-        let len = if self.host_page_size > self.guest_page_size {
-            align_to_page(len, self.host_page_size, self.host_page_shift)
-        } else {
-            align_to_page(len, self.guest_page_size, self.guest_page_shift)
-        };
+        let len = self.align_alloc_size(len);
 
-        let mut maps = self.maps.write().unwrap();
+        // Check if the range is free
+        {
+            let regions = self.regions.read().unwrap();
+            if !self.is_range_free(addr, len, &regions) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "address range already occupied",
+                ));
+            }
+        }
 
+        // Create the mapping
         let mut m = memmap::MmapOptions::new();
         m.len(len);
         if stack {
             m.stack();
         }
 
-        let m = m.map_anon()?;
-        let addr = m.as_ptr() as u64;
-        maps.insert(addr.into(), MemBlock::Map(m));
+        let mmap = m.map_anon()?;
+        let host_ptr = mmap.as_ptr() as *mut u8;
 
-        Ok(addr.into())
+        let region = MemRegion {
+            guest_start: addr,
+            len,
+            host_ptr,
+            perms,
+            _file_backed: false,
+            _mmap: Some(mmap),
+        };
+
+        let mut regions = self.regions.write().unwrap();
+        regions.insert(addr, region);
+
+        Ok(addr)
     }
 
-    pub fn munmap(&mut self, g: GuestAddr, len: usize) {
-        let mut maps = self.maps.write().unwrap();
-        maps.retain(|g_start, m| {
-            // check for intersection
-            // [g, g + len) vs [g_start, g_start + m.len())
-            // only keep those ranges NOT overlapping the requested range
-            (g + len) <= *g_start || (*g_start + m.len()) <= g
-        });
+    /// Create an anonymous mapping at any available address.
+    pub fn mmap(
+        &mut self,
+        len: usize,
+        perms: MemPerms,
+        stack: bool,
+    ) -> ::std::io::Result<GuestAddr> {
+        if len == 0 {
+            return Err(std::io::ErrorKind::InvalidInput.into());
+        }
+
+        let len_aligned = self.align_alloc_size(len);
+        let addr = self
+            .find_free_region(len_aligned, None)
+            .ok_or_else(|| std::io::Error::other("out of memory"))?;
+
+        self.mmap_fixed(addr, len, perms, stack)?;
+
+        // Update next_mmap_addr if we allocated from there
+        let mut next = self.next_mmap_addr.lock().unwrap();
+        if addr.as_u64() <= *next {
+            *next = addr.as_u64().saturating_sub(len_aligned as u64);
+        }
+
+        Ok(addr)
     }
 
-    pub fn g2h(&self, g: GuestAddr) -> Option<HostAddr> {
-        let maps = self.maps.read().unwrap();
-        for (g_start, m) in maps.iter() {
-            if g < *g_start {
-                continue;
-            }
+    /// Map host memory into the guest address space at a specific address.
+    pub fn map_host_fixed(
+        &mut self,
+        gaddr: GuestAddr,
+        host_ptr: *mut u8,
+        len: usize,
+        perms: MemPerms,
+    ) -> ::std::io::Result<GuestAddr> {
+        let len = self.align_alloc_size(len);
 
-            let offset = g - *g_start;
-            if offset < m.len() {
-                // Calculate actual host address based on block type
-                let haddr = match m {
-                    MemBlock::Map(mm) => mm.as_ptr() as u64 + offset as u64,
-                    MemBlock::Injected { _p, .. } => *_p as u64 + offset as u64,
-                    MemBlock::InjectedMut { _p, .. } => *_p as u64 + offset as u64,
-                };
-                return Some(HostAddr(haddr));
+        // Check if the range is free
+        {
+            let regions = self.regions.read().unwrap();
+            if !self.is_range_free(gaddr, len, &regions) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "address range already occupied",
+                ));
             }
         }
 
+        let region = MemRegion {
+            guest_start: gaddr,
+            len,
+            host_ptr,
+            perms,
+            _file_backed: false,
+            _mmap: None,
+        };
+
+        let mut regions = self.regions.write().unwrap();
+        regions.insert(gaddr, region);
+
+        Ok(gaddr)
+    }
+
+    /// Map host memory into the guest address space at any available address.
+    /// This is useful for injecting static data or code.
+    pub fn map_host(
+        &mut self,
+        host_ptr: *const u8,
+        len: usize,
+        perms: MemPerms,
+    ) -> ::std::io::Result<GuestAddr> {
+        let len_aligned = self.align_alloc_size(len);
+        
+        // Find a free region
+        let gaddr = self
+            .find_free_region(len_aligned, None)
+            .ok_or_else(|| std::io::Error::other("out of memory"))?;
+
+        // Check if the range is free
+        {
+            let regions = self.regions.read().unwrap();
+            if !self.is_range_free(gaddr, len_aligned, &regions) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::AlreadyExists,
+                    "address range already occupied",
+                ));
+            }
+        }
+
+        let region = MemRegion {
+            guest_start: gaddr,
+            len: len_aligned,
+            host_ptr: host_ptr as *mut u8,
+            perms,
+            _file_backed: false,
+            _mmap: None,
+        };
+
+        let mut regions = self.regions.write().unwrap();
+        regions.insert(gaddr, region);
+
+        Ok(gaddr)
+    }
+
+    /// Unmap a region of memory.
+    pub fn munmap(&mut self, g: GuestAddr, len: usize) {
+        let mut regions = self.regions.write().unwrap();
+
+        // Find all regions that overlap with the range to unmap
+        let to_remove: Vec<GuestAddr> = regions
+            .values()
+            .filter(|r| r.overlaps(g, len))
+            .map(|r| r.guest_start)
+            .collect();
+
+        for addr in to_remove {
+            regions.remove(&addr);
+        }
+    }
+
+    /// Find the region containing the given guest address.
+    fn find_region(&self, g: GuestAddr) -> Option<MemRegion> {
+        let regions = self.regions.read().unwrap();
+
+        // Find the region with the largest start address that is <= g
+        let candidate = regions
+            .range(..=g)
+            .next_back()
+            .map(|(_, r)| r);
+
+        if let Some(region) = candidate && region.contains(g) {
+            // Clone the region data (pointers are Copy, other fields are small)
+            return Some(MemRegion {
+                guest_start: region.guest_start,
+                len: region.len,
+                host_ptr: region.host_ptr,
+                perms: region.perms,
+                _file_backed: region._file_backed,
+                _mmap: None, // Don't clone the mmap
+            });
+        }
+
         None
+    }
+
+    /// Translate guest address to host address.
+    pub fn g2h(&self, g: GuestAddr) -> Option<HostAddr> {
+        self.find_region(g).map(|r| r.host_addr(g))
+    }
+
+    /// Translate guest address to host address with permission check.
+    pub fn g2h_with_perms(&self, g: GuestAddr, read: bool, write: bool, exec: bool) -> Option<HostAddr> {
+        let region = self.find_region(g)?;
+
+        if read && !region.perms.read {
+            return None;
+        }
+        if write && !region.perms.write {
+            return None;
+        }
+        if exec && !region.perms.exec {
+            return None;
+        }
+
+        Some(region.host_addr(g))
+    }
+
+    /// Get the permissions for a guest address.
+    pub fn get_perms(&self, g: GuestAddr) -> Option<MemPerms> {
+        self.find_region(g).map(|r| r.perms)
+    }
+
+    /// Set permissions for a region.
+    pub fn mprotect(&mut self, g: GuestAddr, len: usize, perms: MemPerms) -> ::std::io::Result<()> {
+        // For now, we don't support changing permissions on partial regions
+        // Find the containing region
+        let regions = self.regions.read().unwrap();
+        let candidate = regions.range(..=g).next_back().map(|(_, r)| r);
+
+        if let Some(region) = candidate
+            && region.guest_start == g
+            && region.len == self.align_alloc_size(len)
+        {
+            drop(regions);
+            let mut regions = self.regions.write().unwrap();
+            if let Some(r) = regions.get_mut(&g) {
+                r.perms = perms;
+                return Ok(());
+            }
+        }
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "mprotect on partial or non-existent region not supported",
+        ))
+    }
+
+    /// Get the page size used by this MMU.
+    pub fn page_size(&self) -> usize {
+        self.guest_page_size
     }
 }
 
@@ -226,7 +575,7 @@ mod tests {
         let mut mmu = GuestMmu::new(4096);
 
         // Allocate a page
-        let gaddr = mmu.mmap(4096, false).unwrap();
+        let gaddr = mmu.mmap(4096, MemPerms::rwx(), false).unwrap();
 
         // g2h should return a valid host address
         let haddr = mmu.g2h(gaddr);
@@ -235,11 +584,8 @@ mod tests {
             "g2h should return Some for allocated memory"
         );
 
-        // For mmap blocks, the guest address IS the mmap pointer (at offset 0),
-        // so g2h returns the same value. What matters is that g2h correctly
-        // resolves to the actual mmap pointer (not just returning guest.0).
-        let haddr = haddr.unwrap();
         // The host address should be valid (non-zero and properly aligned)
+        let haddr = haddr.unwrap();
         assert!(haddr.as_u64() != 0, "Host address should be non-zero");
         // And it should be page-aligned
         assert_eq!(
@@ -250,21 +596,63 @@ mod tests {
     }
 
     #[test]
-    fn test_g2h_with_injected() {
+    fn test_g2h_with_fixed_mmap() {
         let mut mmu = GuestMmu::new(4096);
 
-        // Inject host memory
-        let host_mem: [u8; 1024] = [0; 1024];
-        let gaddr = mmu.consume_host(host_mem.as_ptr(), host_mem.len()).unwrap();
+        // Map at a specific address
+        let target_addr = GuestAddr(0x10000);
+        let gaddr = mmu.mmap_fixed(target_addr, 4096, MemPerms::rwx(), false).unwrap();
+        assert_eq!(gaddr, target_addr);
 
-        // g2h should return the original pointer
+        // g2h should work
         let haddr = mmu.g2h(gaddr);
         assert!(haddr.is_some());
-        assert_eq!(haddr.unwrap().as_u64(), host_mem.as_ptr() as u64);
+
+        // Trying to map at the same address should fail
+        let result = mmu.mmap_fixed(target_addr, 4096, MemPerms::rwx(), false);
+        assert!(result.is_err());
     }
 
     #[test]
-    fn test_g2h_unmapped() {
+    fn test_munmap() {
+        let mut mmu = GuestMmu::new(4096);
+
+        // Allocate two adjacent pages
+        let gaddr1 = mmu.mmap(4096, MemPerms::rwx(), false).unwrap();
+        let gaddr2 = mmu.mmap(4096, MemPerms::rwx(), false).unwrap();
+
+        // Both should be accessible
+        assert!(mmu.g2h(gaddr1).is_some());
+        assert!(mmu.g2h(gaddr2).is_some());
+
+        // Unmap the first
+        mmu.munmap(gaddr1, 4096);
+
+        // First should no longer be accessible
+        assert!(mmu.g2h(gaddr1).is_none());
+        // Second should still be accessible
+        assert!(mmu.g2h(gaddr2).is_some());
+    }
+
+    #[test]
+    fn test_permission_checks() {
+        let mut mmu = GuestMmu::new(4096);
+
+        // Map with read-only permissions
+        let gaddr = mmu.mmap(4096, MemPerms::r(), false).unwrap();
+
+        // Should succeed with read permission
+        assert!(mmu.g2h_with_perms(gaddr, true, false, false).is_some());
+
+        // Should fail with write permission
+        assert!(mmu.g2h_with_perms(gaddr, false, true, false).is_none());
+
+        // Should fail with exec permission
+        assert!(mmu.g2h_with_perms(gaddr, false, false, true).is_none());
+    }
+
+    #[test]
+    fn test_unmapped() {
         let mmu = GuestMmu::new(4096);
 
         // g2h on unmapped address should return None

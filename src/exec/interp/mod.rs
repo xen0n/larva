@@ -1,4 +1,4 @@
-use super::mem::{GuestAddr, GuestMmu};
+use super::mem::{GuestAddr, GuestMmu, MemPerms};
 use super::{RvIsaState, StopReason};
 use crate::rv::{RvDecoder, RvInsn};
 
@@ -180,7 +180,7 @@ impl<'a> RvInterpreterExecutor<'a> {
     }
 
     pub fn stack(&mut self, len: usize) -> ::std::io::Result<()> {
-        let stack_block = self.mmu.mmap(len, true)?;
+        let stack_block = self.mmu.mmap(len, MemPerms::rw(), true)?;
         let stack_top = stack_block + len;
         self.state.set_x(2, stack_top.as_u64());
         Ok(())

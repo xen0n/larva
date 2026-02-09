@@ -1,6 +1,7 @@
 use libc;
 
 use super::{RvInterpreterExecutor, StopReason};
+use crate::exec::mem::GuestAddr;
 
 impl<'a> RvInterpreterExecutor<'a> {
     pub(super) fn do_syscall(&mut self) -> StopReason {
@@ -18,7 +19,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             );
         }
         match nr {
-            64 => self.do_sys_3args(libc::SYS_write, arg0, arg1, arg2),
+            64 => self.do_sys_write(arg0, arg1, arg2),
             // exit_group
             93 => self.do_sys_exit_group(arg0),
 
@@ -39,8 +40,20 @@ impl<'a> RvInterpreterExecutor<'a> {
         unreachable!();
     }
 
-    fn do_sys_3args(&mut self, nr: i64, arg0: u64, arg1: u64, arg2: u64) -> StopReason {
-        let ret = unsafe { libc::syscall(nr, arg0, arg1, arg2) };
+    fn do_sys_write(&mut self, fd: u64, buf_gaddr: u64, count: u64) -> StopReason {
+        // Translate guest buffer address to host address
+        let buf_haddr = match self.mmu.g2h(GuestAddr(buf_gaddr)) {
+            Some(addr) => addr.as_ptr::<u8>(),
+            None => {
+                // Segfault - bad address
+                return StopReason::Segv {
+                    read: true,
+                    gaddr: buf_gaddr,
+                };
+            }
+        };
+
+        let ret = unsafe { libc::syscall(libc::SYS_write, fd as i64, buf_haddr, count as i64) };
         self.sx(10, ret as u64);
         StopReason::Next
     }

@@ -1,4 +1,4 @@
-use larva::exec;
+use larva::exec::{self, mem::MemPerms};
 
 fn main() {
     /*
@@ -26,16 +26,16 @@ fn main() {
 
     let mut state = exec::RvIsaState::default();
 
-    // init MMU, consume the code block
+    // init MMU, map the code block
     let mut mmu = exec::mem::GuestMmu::new(4096); // RV uses 4K pages
-    mmu.consume_host(mem.as_ptr(), mem.len()).unwrap();
+    let gaddr = mmu.map_host(mem.as_ptr(), mem.len(), MemPerms::rwx()).unwrap();
 
     let mut executor = exec::interp::RvInterpreterExecutor::new(64, &mut state, &mut mmu);
     executor.stack(4096).unwrap();
 
-    let block_addr = mem.as_ptr() as u64;
-    let entry_pc = block_addr;
-    println!("code addr = {block_addr:016x}");
+    let entry_pc = gaddr.as_u64();
+    println!("code addr = {:016x}", mem.as_ptr() as u64);
+    println!("guest addr = {entry_pc:016x}");
     println!(" entry pc = {entry_pc:016x}");
     let exit_reason = executor.exec(entry_pc);
     println!("exit_reason = {exit_reason:?}");

@@ -1,3 +1,4 @@
+pub mod elf;
 pub mod interp;
 pub mod mem;
 
