@@ -101,6 +101,12 @@ pub struct LoadedElf {
     pub end_addr: GuestAddr,
     /// ELF interpreter (dynamic linker) if any
     pub interp: Option<String>,
+    /// Program header address
+    pub phdr_addr: GuestAddr,
+    /// Number of program headers
+    pub phnum: u16,
+    /// Size of program header entry
+    pub phent: u16,
 }
 
 fn read_u16_le(bytes: &[u8], offset: usize) -> u16 {
@@ -281,11 +287,24 @@ pub fn load_elf_static_from_bytes(
         load_segment_data(mmu, data, ph)?;
     }
 
+    // Calculate program header virtual address
+    // The phdrs are at file offset e_phoff, find which segment contains them
+    let phdr_addr = load_segments
+        .iter()
+        .find(|ph| {
+            ph.p_offset <= ehdr.e_phoff && ehdr.e_phoff < ph.p_offset + ph.p_filesz
+        })
+        .map(|ph| GuestAddr(ph.p_vaddr + (ehdr.e_phoff - ph.p_offset)))
+        .unwrap_or(GuestAddr(0));
+
     Ok(LoadedElf {
         entry: GuestAddr(ehdr.e_entry),
         base_addr: GuestAddr(min_vaddr),
         end_addr: GuestAddr(max_end),
         interp: None,
+        phdr_addr,
+        phnum: ehdr.e_phnum,
+        phent: ehdr.e_phentsize,
     })
 }
 
@@ -327,14 +346,14 @@ fn load_segment_data(mmu: &mut GuestMmu, data: &[u8], ph: &Elf64Phdr) -> Result<
 /// Load an ELF binary and set up the execution environment.
 ///
 /// This is a convenience function that loads the ELF, creates a stack,
-/// and returns the entry point and initial stack pointer.
+/// and returns the LoadedElf info and initial stack pointer.
 pub fn load_and_setup<P: AsRef<Path>>(
     mmu: &mut GuestMmu,
     path: P,
     _argv: &[String],
     _envp: &[String],
     stack_size: usize,
-) -> Result<(GuestAddr, GuestAddr), ElfLoadError> {
+) -> Result<(LoadedElf, GuestAddr), ElfLoadError> {
     // Load the ELF
     let elf = load_elf_static(mmu, path)?;
 
@@ -358,7 +377,7 @@ pub fn load_and_setup<P: AsRef<Path>>(
     // For now, just return the top of stack
     // The runner needs to write the initial stack frame
 
-    Ok((elf.entry, stack_top))
+    Ok((elf, stack_top))
 }
 
 #[cfg(test)]

@@ -310,8 +310,24 @@ impl<'a> RvInterpreterExecutor<'a> {
     pub fn exec(&mut self, entry_pc: u64) -> Option<StopReason> {
         self.state.set_pc(entry_pc);
 
+        // Open trace log file if LARVA_TRACE is set
+        let mut trace_file: Option<std::fs::File> = std::env::var("LARVA_TRACE")
+            .ok()
+            .and_then(|path| {
+                eprintln!("Tracing execution to: {path}");
+                std::fs::File::create(&path).ok()
+            });
+
         loop {
+            let pc = self.state.get_pc();
             let x = self.exec_one();
+
+            // Log to trace file if enabled
+            if let Some(file) = &mut trace_file {
+                use std::io::Write;
+                let _ = writeln!(file, "pc={:016x}", pc);
+            }
+
             match x {
                 StopReason::Next | StopReason::ContinueAt(_) => {}
                 _ => return Some(x),
@@ -340,12 +356,25 @@ impl<'a> RvInterpreterExecutor<'a> {
     }
 
     fn exec_one(&mut self) -> StopReason {
+        let _pc = self.state.get_pc();
         let (insn, len) = match self.fetch_insn() {
             Ok((insn, len)) => (insn, len),
             Err(e) => return e,
         };
         if self.debug {
             println!("decoded {len}b: {insn:?}");
+        }
+
+        // Debug trace controlled by LARVA_DEBUG env var
+        if std::env::var("LARVA_DEBUG").is_ok() {
+            let x2 = self.gx(2);
+            let x8 = self.gx(8);
+            let x9 = self.gx(9);
+            let x10 = self.gx(10);
+            let x11 = self.gx(11);
+            let x14 = self.gx(14);
+            let x15 = self.gx(15);
+            eprintln!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x11={x11:016x} x14={x14:016x} x15={x15:016x}");
         }
 
         let res = self.interpret_one(&insn, len);
