@@ -266,7 +266,7 @@ impl<'a> RvInterpreterExecutor<'a> {
         StopReason::Next
     }
 
-    fn do_sys_mmap(&mut self, addr: u64, len: u64, prot: u64, flags: u64, fd: u64, _offset: u64) -> StopReason {
+    fn do_sys_mmap(&mut self, addr: u64, len: u64, prot: u64, flags: u64, fd: u64, offset: u64) -> StopReason {
         // mmap - map files or devices into memory
         // For now, support anonymous mappings (MAP_ANONYMOUS)
         // flags & 0x20 = MAP_ANONYMOUS
@@ -274,12 +274,14 @@ impl<'a> RvInterpreterExecutor<'a> {
         const MAP_ANONYMOUS: u64 = 0x20;
         const MAP_FIXED: u64 = 0x10;
         
+        let _ = offset; // Not used yet
+        
         let is_anon = (flags & MAP_ANONYMOUS) != 0;
         let is_fixed = (flags & MAP_FIXED) != 0;
         
         if is_anon {
             // Anonymous mapping - allocate memory in our MMU
-            use crate::exec::mem::{GuestAddr, MemPerms};
+            use crate::exec::mem::MemPerms;
             
             // Convert prot to MemPerms
             let perms = MemPerms {
@@ -324,7 +326,7 @@ impl<'a> RvInterpreterExecutor<'a> {
         StopReason::Next
     }
 
-    fn do_sys_prlimit64(&mut self, pid: u64, resource: u64, new_limit_gaddr: u64, old_limit_gaddr: u64) -> StopReason {
+    fn do_sys_prlimit64(&mut self, _pid: u64, resource: u64, _new_limit_gaddr: u64, old_limit_gaddr: u64) -> StopReason {
         // prlimit64 - get/set resource limits
         // For now, just return success with default values for RLIMIT_STACK
         // resource 3 = RLIMIT_STACK
