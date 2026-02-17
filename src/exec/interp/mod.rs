@@ -408,17 +408,19 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             // Check x10 (a0) buffer - auxv buffer in __init_tls
             if pc >= 0x11bb0 && pc <= 0x11d00 {
-                if let Ok(val) = self.get_u64((x10).into()) {
-                    println!("  [auxv] x10+0  ={val:016x} (aux[0]=AT_PHDR)");
-                }
-                if let Ok(val) = self.get_u64((x10 + 24).into()) {
-                    println!("  [auxv] x10+24 ={val:016x} (aux[3]=AT_PAGESZ)");
-                }
-                if let Ok(val) = self.get_u64((x10 + 32).into()) {
-                    println!("  [auxv] x10+32 ={val:016x} (aux[4]=AT_ENTRY)");
-                }
-                if let Ok(val) = self.get_u64((x10 + 40).into()) {
-                    println!("  [auxv] x10+40 ={val:016x} (aux[5]=AT_HWCAP/etc)");
+                // Read first 304 bytes of buffer to see layout (musl uses up to type 37)
+                eprintln!("  [auxvbuf@{:016x}]:", x10);
+                for off in (0..304).step_by(32) {
+                    eprint!("  [{:3}]: ", off);
+                    for j in 0..4 {
+                        let addr = x10 + off + j * 8;
+                        if let Ok(val) = self.get_u64((addr).into()) {
+                            eprint!("{:016x} ", val);
+                        } else {
+                            eprint!("???????????????? ");
+                        }
+                    }
+                    eprintln!();
                 }
             }
         }
