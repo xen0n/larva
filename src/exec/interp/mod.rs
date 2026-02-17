@@ -384,14 +384,15 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
 
         // Detailed trace for crash site regions
-        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) || (pc >= 0x11bb0 && pc <= 0x11d00) {
+        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) || (pc >= 0x11bb0 && pc <= 0x11d00) || (pc >= 0x102a0 && pc <= 0x10380) {
             let x2 = self.gx(2);
             let x8 = self.gx(8);
             let x9 = self.gx(9);
             let x10 = self.gx(10);
+            let x11 = self.gx(11);
             let x14 = self.gx(14);
             let x15 = self.gx(15);
-            println!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x14={x14:016x} x15={x15:016x}");
+            println!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x11={x11:016x} x14={x14:016x} x15={x15:016x}");
             
             // Read stack values
             if let Ok(val) = self.get_u64((x2 + 24).into()) {
@@ -421,6 +422,31 @@ impl<'a> RvInterpreterExecutor<'a> {
                         }
                     }
                     eprintln!();
+                }
+            }
+            
+            // Trace __init_libc auxv copy loop (PC 0x102a6 area)
+            // a0 = pointer to stack auxv
+            if pc >= 0x102a0 && pc <= 0x10380 {
+                // Dump stack auxv at a0
+                eprintln!("  [stack auxv @{:016x}]:", x10);
+                for off in (0..80).step_by(16) {
+                    if let Ok(typ) = self.get_u64((x10 + off).into()) {
+                        if let Ok(val) = self.get_u64((x10 + off + 8).into()) {
+                            if typ == 0 && val == 0 {
+                                eprintln!("    [{:2}] AT_NULL", off/16);
+                                break;
+                            }
+                            eprintln!("    [{:2}] type={:2} -> 0x{:016x}", off/16, typ, val);
+                        }
+                    }
+                }
+                // Also dump the local buffer at sp+48
+                eprintln!("  [local buf @ sp+48]:")
+;                for off in (0..80).step_by(8) {
+                    if let Ok(val) = self.get_u64((x2 + 48 + off).into()) {
+                        eprintln!("    [{:2}] = 0x{:016x}", off/8, val);
+                    }
                 }
             }
         }
