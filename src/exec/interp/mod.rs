@@ -384,7 +384,7 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
 
         // Detailed trace for crash site regions
-        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f50) {
+        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) {
             let x2 = self.gx(2);
             let x8 = self.gx(8);
             let x9 = self.gx(9);
@@ -399,6 +399,12 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             if let Ok(val) = self.get_u64((x2 + 40).into()) {
                 println!("  [stack] sp+40={val:016x} (saved ra)");
+            }
+            // Check x8-112 area
+            if x8 >= 112 {
+                if let Ok(val) = self.get_u64((x8 - 112).into()) {
+                    println!("  [data] x8-112={val:016x}");
+                }
             }
         }
 
