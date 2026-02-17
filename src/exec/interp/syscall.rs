@@ -36,6 +36,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             93 => self.do_sys_exit(arg0),
             94 => self.do_sys_exit_group(arg0),
             96 => self.do_sys_set_tid_address(arg1),
+            135 => self.do_sys_rt_sigprocmask(arg0, arg1, arg2, arg3),
             160 => self.do_sys_uname(arg0),
             214 => self.do_sys_brk(arg0),
             226 => self.do_sys_mprotect(arg0, arg1, arg2),
@@ -189,6 +190,15 @@ impl<'a> RvInterpreterExecutor<'a> {
         };
 
         self.sx(10, ret);
+        StopReason::Next
+    }
+
+    fn do_sys_rt_sigprocmask(&mut self, how: u64, set_gaddr: u64, oldset_gaddr: u64, sigsetsize: u64) -> StopReason {
+        // rt_sigprocmask - examine and change blocked signals
+        // For now, just return success
+        // how: SIG_BLOCK=0, SIG_UNBLOCK=1, SIG_SETMASK=2
+        let _ = (how, set_gaddr, oldset_gaddr, sigsetsize);
+        self.sx(10, 0); // Success
         StopReason::Next
     }
 
