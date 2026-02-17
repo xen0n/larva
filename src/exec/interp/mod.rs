@@ -427,6 +427,35 @@ impl<'a> RvInterpreterExecutor<'a> {
             
             // Trace __init_libc auxv copy loop (PC 0x102a6 area)
             // a0 = pointer to stack auxv
+            // Trace __init_libc auxv processing
+            // PC 0x102a6: ld a5, 0(a0) - load type from auxv
+            // PC 0x1036a: slli a5, a5, 3 - type * 8
+            // PC 0x10372: sd a3, -304(a5) - store to buffer
+            if pc == 0x102a6 {
+                let a0 = self.gx(10);
+                if let Ok(typ) = self.get_u64((a0).into()) {
+                    if let Ok(val) = self.get_u64((a0 + 8).into()) {
+                        eprintln!("  [AUXV] auxv@{:016x}: type={:2} val=0x{:016x}", a0, typ, val);
+                    }
+                }
+            }
+            if pc == 0x1036a {
+                // After this instruction: slli a5, a5, 3
+                // a5 has the type before the shift
+                let a5_before = self.gx(15); // a5 before shift = type
+                let a5_after = (a5_before as i64) << 3; // what a5 will be after slli
+                eprintln!("  [SHIFT] type={} -> offset={}", a5_before, a5_after);
+            }
+            if pc == 0x10372 {
+                let a3 = self.gx(13); // value to store
+                let a5 = self.gx(15); // address calculation: a5 = sp + 48 + offset + 304
+                // Store is at a5 - 304 = sp + 48 + offset
+                let store_addr = a5.wrapping_sub(304);
+                let buf_offset = store_addr.wrapping_sub(x2 + 48);
+                let type_idx = buf_offset / 8;
+                eprintln!("  [COPY] a5={:016x} store@={:016x} buf_offset={} buffer[{}] = 0x{:016x}", 
+                    a5, store_addr, buf_offset, type_idx, a3);
+            }
             if pc >= 0x102a0 && pc <= 0x10380 {
                 // Dump stack auxv at a0
                 eprintln!("  [stack auxv @{:016x}]:", x10);
@@ -442,8 +471,8 @@ impl<'a> RvInterpreterExecutor<'a> {
                     }
                 }
                 // Also dump the local buffer at sp+48
-                eprintln!("  [local buf @ sp+48]:")
-;                for off in (0..80).step_by(8) {
+                eprintln!("  [local buf @ sp+48]:");
+                for off in (0..80).step_by(8) {
                     if let Ok(val) = self.get_u64((x2 + 48 + off).into()) {
                         eprintln!("    [{:2}] = 0x{:016x}", off/8, val);
                     }
