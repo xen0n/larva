@@ -152,6 +152,10 @@ fn main() {
     // Initialize MMU with 4KB pages
     let mut mmu = larva::exec::mem::GuestMmu::new(4096);
 
+    // Map a page at address 0 to catch NULL pointer dereferences gracefully
+    // This allows us to see what musl is trying to do without crashing immediately
+    let _ = mmu.mmap_fixed(GuestAddr(0), 4096, MemPerms::rw(), false);
+
     // Load the ELF binary
     let (elf_info, sp) = match elf::load_and_setup(&mut mmu, elf_path, &argv, &envp, 1024 * 1024) {
         Ok(result) => result,
