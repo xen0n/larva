@@ -39,6 +39,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             135 => self.do_sys_rt_sigprocmask(arg0, arg1, arg2, arg3),
             160 => self.do_sys_uname(arg0),
             214 => self.do_sys_brk(arg0),
+            222 => self.do_sys_mmap(arg0, arg1, arg2, arg3, arg4, arg5),
             226 => self.do_sys_mprotect(arg0, arg1, arg2),
             261 => self.do_sys_prlimit64(arg0, arg1, arg2, arg3),
             278 => self.do_sys_getrandom(arg0, arg1, arg2),
@@ -262,6 +263,55 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
 
         self.sx(10, buflen); // Return number of bytes written
+        StopReason::Next
+    }
+
+    fn do_sys_mmap(&mut self, addr: u64, len: u64, prot: u64, flags: u64, fd: u64, _offset: u64) -> StopReason {
+        // mmap - map files or devices into memory
+        // For now, support anonymous mappings (MAP_ANONYMOUS)
+        // flags & 0x20 = MAP_ANONYMOUS
+        
+        const MAP_ANONYMOUS: u64 = 0x20;
+        const MAP_FIXED: u64 = 0x10;
+        
+        let is_anon = (flags & MAP_ANONYMOUS) != 0;
+        let is_fixed = (flags & MAP_FIXED) != 0;
+        
+        if is_anon {
+            // Anonymous mapping - allocate memory in our MMU
+            use crate::exec::mem::{GuestAddr, MemPerms};
+            
+            // Convert prot to MemPerms
+            let perms = MemPerms {
+                read: (prot & 1) != 0,
+                write: (prot & 2) != 0,
+                exec: (prot & 4) != 0,
+            };
+            
+            let result = if is_fixed && addr != 0 {
+                // MAP_FIXED - map at specific address
+                self.mmu.mmap_fixed(GuestAddr(addr), len as usize, perms, false)
+                    .map(|_| addr)
+            } else {
+                // Regular anonymous mapping - let MMU choose address
+                self.mmu.mmap(len as usize, perms, false)
+                    .map(|gaddr| gaddr.as_u64())
+            };
+            
+            match result {
+                Ok(gaddr) => {
+                    self.sx(10, gaddr);
+                }
+                Err(_) => {
+                    self.sx(10, u64::wrapping_neg(12)); // -ENOMEM
+                }
+            }
+        } else {
+            // File-backed mapping - not yet supported
+            eprintln!("mmap: file-backed mapping not supported (fd={})", fd);
+            self.sx(10, u64::wrapping_neg(38)); // -ENOSYS
+        }
+        
         StopReason::Next
     }
 
