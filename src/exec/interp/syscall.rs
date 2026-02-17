@@ -38,6 +38,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             160 => self.do_sys_uname(arg0),
             214 => self.do_sys_brk(arg0),
             226 => self.do_sys_mprotect(arg0, arg1, arg2),
+            261 => self.do_sys_prlimit64(arg0, arg1, arg2, arg3),
             278 => self.do_sys_getrandom(arg0, arg1, arg2),
 
             _ => {
@@ -250,6 +251,29 @@ impl<'a> RvInterpreterExecutor<'a> {
         // In a real implementation, we'd update the MMU permissions
         // prot bits: PROT_READ=1, PROT_WRITE=2, PROT_EXEC=4
         let _ = (addr, len, prot);
+        self.sx(10, 0); // Success
+        StopReason::Next
+    }
+
+    fn do_sys_prlimit64(&mut self, pid: u64, resource: u64, new_limit_gaddr: u64, old_limit_gaddr: u64) -> StopReason {
+        // prlimit64 - get/set resource limits
+        // For now, just return success with default values for RLIMIT_STACK
+        // resource 3 = RLIMIT_STACK
+        
+        if resource == 3 && old_limit_gaddr != 0 {
+            // Write default stack limit to old_limit
+            // struct rlimit64 { rlim64_t rlim_cur; rlim64_t rlim_max; }
+            // Each is 8 bytes, total 16 bytes
+            if let Some(haddr) = self.mmu.g2h(GuestAddr(old_limit_gaddr)) {
+                unsafe {
+                    // rlim_cur = 8MB (default stack size)
+                    (haddr.as_mut_ptr::<u64>()).write(8 * 1024 * 1024);
+                    // rlim_max = RLIM_INFINITY (~0)
+                    (haddr.as_mut_ptr::<u64>().add(1)).write(u64::MAX);
+                }
+            }
+        }
+        
         self.sx(10, 0); // Success
         StopReason::Next
     }
