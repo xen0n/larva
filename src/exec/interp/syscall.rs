@@ -33,7 +33,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             64 => self.do_sys_write(arg0, arg1, arg2),
             66 => self.do_sys_writev(arg0, arg1, arg2),
             79 => self.do_sys_newfstatat(arg0, arg1, arg2, arg3),
-            93 => self.do_sys_exit_group(arg0),
+            93 => self.do_sys_exit(arg0),
+            94 => self.do_sys_exit_group(arg0),
             96 => self.do_sys_set_tid_address(arg1),
             160 => self.do_sys_uname(arg0),
             214 => self.do_sys_brk(arg0),
@@ -65,6 +66,14 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
 
         result
+    }
+
+    fn do_sys_exit(&mut self, exitcode: u64) -> ! {
+        // Exit the current thread (in our emulator, just exit the process)
+        unsafe {
+            libc::syscall(libc::SYS_exit, exitcode as i64);
+        }
+        unreachable!();
     }
 
     fn do_sys_exit_group(&mut self, exitcode: u64) -> ! {
