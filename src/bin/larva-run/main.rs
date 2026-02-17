@@ -172,8 +172,47 @@ fn main() {
         elf_info.phdr_addr.as_u64()
     );
 
+    // Use minimal envp for debugging
+    let minimal_envp = vec!["PATH=/bin".to_string()];
+    
     // Setup stack with argc/argv/envp/auxv
-    let sp = setup_stack(&mut mmu, sp, argv.len() as u64, &argv, &envp, &elf_info);
+    let sp = setup_stack(&mut mmu, sp, argv.len() as u64, &argv, &minimal_envp, &elf_info);
+    
+    // Debug: print stack layout
+    if std::env::var("LARVA_DEBUG_STACK").is_ok() {
+        if let Some(haddr) = mmu.g2h(sp) {
+            let ptr = haddr.as_ptr::<u64>();
+            unsafe {
+                eprintln!("=== Stack Layout ===");
+                eprintln!("sp = {:016x}", sp.as_u64());
+                eprintln!("argc = {}", *ptr);
+                eprintln!("argv[0] = {:016x}", *ptr.add(1));
+                let argc = *ptr as usize;
+                for i in 0..=argc {
+                    eprintln!("argv[{}] = {:016x}", i, *ptr.add(1 + i));
+                }
+                // Find envp (after argv NULL)
+                let mut envp_idx = 1 + argc + 1;
+                while *ptr.add(envp_idx) != 0 {
+                    eprintln!("envp[{}] = {:016x}", envp_idx - (1 + argc + 1), *ptr.add(envp_idx));
+                    envp_idx += 1;
+                }
+                eprintln!("envp NULL at idx {}", envp_idx);
+                // auxv starts after envp NULL
+                let auxv_idx = envp_idx + 1;
+                eprintln!("auxv starts at idx {}", auxv_idx);
+                let mut i = 0;
+                while *ptr.add(auxv_idx + i) != 0 {
+                    let typ = *ptr.add(auxv_idx + i);
+                    let val = *ptr.add(auxv_idx + i + 1);
+                    eprintln!("auxv[{}] = {} (0x{:x}) -> 0x{:016x}", i/2, typ, typ, val);
+                    i += 2;
+                }
+                eprintln!("auxv AT_NULL at idx {}", auxv_idx + i);
+                eprintln!("===================");
+            }
+        }
+    }
 
     // Initialize CPU state
     let mut state = RvIsaState::default();
