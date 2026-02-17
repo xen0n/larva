@@ -384,7 +384,7 @@ impl<'a> RvInterpreterExecutor<'a> {
         }
 
         // Detailed trace for crash site regions
-        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) {
+        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) || (pc >= 0x11bb0 && pc <= 0x11d00) {
             let x2 = self.gx(2);
             let x8 = self.gx(8);
             let x9 = self.gx(9);
@@ -404,6 +404,21 @@ impl<'a> RvInterpreterExecutor<'a> {
             if x8 >= 112 {
                 if let Ok(val) = self.get_u64((x8 - 112).into()) {
                     println!("  [data] x8-112={val:016x}");
+                }
+            }
+            // Check x10 (a0) buffer - auxv buffer in __init_tls
+            if pc >= 0x11bb0 && pc <= 0x11d00 {
+                if let Ok(val) = self.get_u64((x10).into()) {
+                    println!("  [auxv] x10+0  ={val:016x} (aux[0]=AT_PHDR)");
+                }
+                if let Ok(val) = self.get_u64((x10 + 24).into()) {
+                    println!("  [auxv] x10+24 ={val:016x} (aux[3]=AT_PAGESZ)");
+                }
+                if let Ok(val) = self.get_u64((x10 + 32).into()) {
+                    println!("  [auxv] x10+32 ={val:016x} (aux[4]=AT_ENTRY)");
+                }
+                if let Ok(val) = self.get_u64((x10 + 40).into()) {
+                    println!("  [auxv] x10+40 ={val:016x} (aux[5]=AT_HWCAP/etc)");
                 }
             }
         }

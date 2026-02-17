@@ -9,6 +9,8 @@ const AT_PHNUM: u64 = 5;
 const AT_PAGESZ: u64 = 6;
 const AT_ENTRY: u64 = 9;
 const AT_RANDOM: u64 = 25;
+const AT_HWCAP: u64 = 16;
+const AT_SYSINFO: u64 = 32;
 
 fn setup_stack(
     mmu: &mut larva::exec::mem::GuestMmu,
@@ -36,7 +38,7 @@ fn setup_stack(
     // [string data]
 
     // Number of auxv entries (including terminating AT_NULL)
-    let num_auxv = 7; // AT_PHDR, AT_PHENT, AT_PHNUM, AT_PAGESZ, AT_ENTRY, AT_RANDOM, AT_NULL
+    let num_auxv = 9; // AT_PHDR, AT_PHENT, AT_PHNUM, AT_PAGESZ, AT_ENTRY, AT_HWCAP, AT_SYSINFO, AT_RANDOM, AT_NULL
 
     let auxv_offset = ptr_size * (1 + num_argv + 1 + num_envp + 1);
     let strings_start_offset = auxv_offset + ptr_size * 2 * num_auxv;
@@ -117,6 +119,16 @@ fn setup_stack(
         // AT_ENTRY - entry point
         *auxv_base.add(idx) = AT_ENTRY;
         *auxv_base.add(idx + 1) = elf_info.entry.as_u64();
+        idx += 2;
+
+        // AT_HWCAP - hardware capabilities (0 for now)
+        *auxv_base.add(idx) = AT_HWCAP;
+        *auxv_base.add(idx + 1) = 0;
+        idx += 2;
+
+        // AT_SYSINFO - vdso/entry point for syscalls (0 for now, no vdso)
+        *auxv_base.add(idx) = AT_SYSINFO;
+        *auxv_base.add(idx + 1) = 0;
         idx += 2;
 
         // AT_RANDOM - pointer to 16 random bytes
@@ -212,6 +224,21 @@ fn main() {
                 eprintln!("===================");
             }
         }
+    }
+    
+    // Debug: print the actual auxv buffer that will be passed to __init_libc
+    // musl copies auxv into a local buffer at sp+48, indexed by type
+    if std::env::var("LARVA_DEBUG_AUXV").is_ok() {
+        eprintln!("=== Expected auxv buffer layout (at sp+48) ===");
+        eprintln!("buffer[AT_PHDR=3] at sp+48+24 = auxv[AT_PHDR] value");
+        eprintln!("buffer[AT_PHENT=4] at sp+48+32 = auxv[AT_PHENT] value");
+        eprintln!("buffer[AT_PHNUM=5] at sp+48+40 = auxv[AT_PHNUM] value");
+        eprintln!("buffer[AT_PAGESZ=6] at sp+48+48 = auxv[AT_PAGESZ] value");
+        eprintln!("buffer[AT_ENTRY=9] at sp+48+72 = auxv[AT_ENTRY] value");
+        eprintln!("buffer[AT_RANDOM=25] at sp+48+200 = auxv[AT_RANDOM] value");
+        eprintln!("buffer[AT_HWCAP=16] at sp+48+128 = should be 0 or set");
+        eprintln!("buffer[AT_SYSINFO=32] at sp+48+256 = should be 0 or set");
+        eprintln!("=============================================");
     }
 
     // Initialize CPU state
