@@ -174,6 +174,7 @@ fn main() {
     // Initialize CPU state
     let mut state = RvIsaState::default();
     state.set_x(2, sp.as_u64()); // x2 = sp
+    state.set_x(8, sp.as_u64()); // x8 = s0/fp - initialize frame pointer to stack
 
     // Allocate and set up thread-local storage (required by musl)
     let tls_size = 0x1000;

@@ -383,8 +383,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
         }
 
-        // Detailed trace for crash site region
-        if pc >= 0x1216f0 && pc <= 0x121710 {
+        // Detailed trace for crash site regions
+        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f50) {
             let x2 = self.gx(2);
             let x8 = self.gx(8);
             let x9 = self.gx(9);
