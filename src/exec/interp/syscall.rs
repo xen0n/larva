@@ -29,6 +29,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             64 => self.do_sys_write(arg0, arg1, arg2),
             66 => self.do_sys_writev(arg0, arg1, arg2),
             96 => self.do_sys_set_tid_address(arg1),
+            214 => self.do_sys_brk(arg0),
             // exit_group
             93 => self.do_sys_exit_group(arg0),
 
@@ -126,6 +127,35 @@ impl<'a> RvInterpreterExecutor<'a> {
         // In a real implementation, this would set the clear_child_tid address
         let ret = unsafe { libc::syscall(libc::SYS_getpid) };
         self.sx(10, ret as u64);
+        StopReason::Next
+    }
+
+    fn do_sys_brk(&mut self, addr: u64) -> StopReason {
+        // Simple brk implementation - use the end of the loaded ELF as the base
+        // In a real implementation, we'd track this properly
+        const BRK_BASE: u64 = 0x0000_0000_001c_0000; // Arbitrary high address for heap
+        const BRK_MAX: u64 = 0x0000_0000_0020_0000;
+
+        static mut CUR_BRK: u64 = BRK_BASE;
+
+        let ret = if addr == 0 {
+            // Query current brk
+            unsafe { CUR_BRK }
+        } else if addr < BRK_BASE {
+            // Invalid - below base
+            unsafe { CUR_BRK }
+        } else if addr > BRK_MAX {
+            // Can't extend that far
+            unsafe { CUR_BRK }
+        } else {
+            // Extend brk
+            unsafe {
+                CUR_BRK = addr;
+                CUR_BRK
+            }
+        };
+
+        self.sx(10, ret);
         StopReason::Next
     }
 }
