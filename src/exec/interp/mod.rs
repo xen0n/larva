@@ -356,7 +356,7 @@ impl<'a> RvInterpreterExecutor<'a> {
     }
 
     fn exec_one(&mut self) -> StopReason {
-        let pc = self.state.get_pc();
+        let _pc = self.state.get_pc();
         let (insn, len) = match self.fetch_insn() {
             Ok((insn, len)) => (insn, len),
             Err(e) => return e,
@@ -365,26 +365,8 @@ impl<'a> RvInterpreterExecutor<'a> {
             println!("decoded {len}b: {insn:?}");
         }
 
-        // Track when x8 or x9 changes
-        static mut LAST_X8: u64 = 0;
-        static mut LAST_X9: u64 = 0;
-        let x8_current = self.gx(8);
-        let x9_current = self.gx(9);
-        unsafe {
-            let last_x8 = LAST_X8;
-            let last_x9 = LAST_X9;
-            if x8_current != last_x8 {
-                println!("  [x8-change] pc={pc:016x} x8={x8_current:016x} (was {:016x})", last_x8);
-                LAST_X8 = x8_current;
-            }
-            if x9_current != last_x9 {
-                println!("  [x9-change] pc={pc:016x} x9={x9_current:016x} (was {:016x})", last_x9);
-                LAST_X9 = x9_current;
-            }
-        }
-
-        // Detailed trace for crash site regions
-        if (pc >= 0x1216f0 && pc <= 0x121710) || (pc >= 0xe4f40 && pc <= 0xe4f60) || (pc >= 0x11bb0 && pc <= 0x11d00) || (pc >= 0x102a0 && pc <= 0x10380) {
+        // Debug trace controlled by LARVA_DEBUG env var
+        if std::env::var("LARVA_DEBUG").is_ok() {
             let x2 = self.gx(2);
             let x8 = self.gx(8);
             let x9 = self.gx(9);
@@ -392,118 +374,7 @@ impl<'a> RvInterpreterExecutor<'a> {
             let x11 = self.gx(11);
             let x14 = self.gx(14);
             let x15 = self.gx(15);
-            println!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x11={x11:016x} x14={x14:016x} x15={x15:016x}");
-            
-            // Read stack values
-            if let Ok(val) = self.get_u64((x2 + 24).into()) {
-                println!("  [stack] sp+24={val:016x} (saved x8)");
-            }
-            if let Ok(val) = self.get_u64((x2 + 40).into()) {
-                println!("  [stack] sp+40={val:016x} (saved ra)");
-            }
-            // Check x8-112 area
-            if x8 >= 112 {
-                if let Ok(val) = self.get_u64((x8 - 112).into()) {
-                    println!("  [data] x8-112={val:016x}");
-                }
-            }
-            // Check x10 (a0) buffer - auxv buffer in __init_tls
-            if pc == 0x11bb0 {
-                // Entry to __init_tls - check what buffer was passed in a0
-                let a0 = self.gx(10);
-                eprintln!("  [__init_tls ENTRY] a0(buf)={:016x} sp={:016x}", a0, x2);
-                // Show what's at a0 (the passed buffer)
-                eprint!("  [a0 buffer]: ");
-                for off in (0..80).step_by(8) {
-                    if let Ok(val) = self.get_u64((a0 + off).into()) {
-                        eprint!("{:016x} ", val);
-                    }
-                }
-                eprintln!();
-            }
-            
-            // Trace __init_libc auxv copy loop (PC 0x102a6 area)
-            // a0 = pointer to stack auxv
-            // Trace __init_libc auxv processing
-            // PC 0x102a6: ld a5, 0(a0) - load type from auxv
-            // PC 0x1036a: slli a5, a5, 3 - type * 8
-            // PC 0x10372: sd a3, -304(a5) - store to buffer
-            if pc == 0x102a6 {
-                let a0 = self.gx(10);
-                if let Ok(typ) = self.get_u64((a0).into()) {
-                    if let Ok(val) = self.get_u64((a0 + 8).into()) {
-                        eprintln!("  [AUXV] auxv@{:016x}: type={:2} val=0x{:016x}", a0, typ, val);
-                    }
-                }
-            }
-            if pc == 0x1036a {
-                // After this instruction: slli a5, a5, 3
-                // a5 has the type before the shift
-                let a5_before = self.gx(15); // a5 before shift = type
-                let a5_after = (a5_before as i64) << 3; // what a5 will be after slli
-                eprintln!("  [SHIFT] type={} -> offset={}", a5_before, a5_after);
-            }
-            if pc == 0x10372 {
-                let a3 = self.gx(13); // value to store
-                let a5 = self.gx(15); // address calculation: a5 = sp + 48 + offset + 304
-                // Store is at a5 - 304 = sp + 48 + offset
-                let store_addr = a5.wrapping_sub(304);
-                let buf_offset = store_addr.wrapping_sub(x2 + 48);
-                let type_idx = buf_offset / 8;
-                eprintln!("  [COPY] sp={:016x} store@={:016x} buffer[{}] = 0x{:016x}", 
-                    x2, store_addr, type_idx, a3);
-                // Verify the store actually happened by reading back
-                if let Ok(written) = self.get_u64((store_addr).into()) {
-                    if written == a3 {
-                        eprintln!("  [VERIFY] Store OK: 0x{:016x}", written);
-                    } else {
-                        eprintln!("  [VERIFY] Store MISMATCH: wrote 0x{:016x} but read 0x{:016x}!!", a3, written);
-                        // Check what's at the address as 32-bit words
-                        let lo = (written & 0xFFFFFFFF) as u32;
-                        let hi = ((written >> 32) & 0xFFFFFFFF) as u32;
-                        eprintln!("         As u32: lo=0x{:08x} hi=0x{:08x}", lo, hi);
-                    }
-                } else {
-                    eprintln!("  [VERIFY] Store FAILED: cannot read back from 0x{:016x}", store_addr);
-                }
-            }
-            
-            // After the store instruction executes, verify
-            if pc == 0x10376 {
-                // Check what was stored at the previous instruction's target
-                // We need to re-calculate the address
-                let a5 = self.gx(15); // a5 hasn't changed yet
-                let store_addr = a5.wrapping_sub(304);
-                let a3 = self.gx(13); // a3 still has the value
-                if let Ok(written) = self.get_u64((store_addr).into()) {
-                    if written != a3 {
-                        eprintln!("  [POST-STORE] FAILED: addr=0x{:016x} expected=0x{:016x} got=0x{:016x}",
-                            store_addr, a3, written);
-                    }
-                }
-            }
-            if pc >= 0x102a0 && pc <= 0x10380 {
-                // Dump stack auxv at a0
-                eprintln!("  [stack auxv @{:016x}]:", x10);
-                for off in (0..80).step_by(16) {
-                    if let Ok(typ) = self.get_u64((x10 + off).into()) {
-                        if let Ok(val) = self.get_u64((x10 + off + 8).into()) {
-                            if typ == 0 && val == 0 {
-                                eprintln!("    [{:2}] AT_NULL", off/16);
-                                break;
-                            }
-                            eprintln!("    [{:2}] type={:2} -> 0x{:016x}", off/16, typ, val);
-                        }
-                    }
-                }
-                // Also dump the local buffer at sp+48
-                eprintln!("  [local buf @ sp+48]:");
-                for off in (0..80).step_by(8) {
-                    if let Ok(val) = self.get_u64((x2 + 48 + off).into()) {
-                        eprintln!("    [{:2}] = 0x{:016x}", off/8, val);
-                    }
-                }
-            }
+            eprintln!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x11={x11:016x} x14={x14:016x} x15={x15:016x}");
         }
 
         let res = self.interpret_one(&insn, len);
