@@ -105,6 +105,16 @@ cd .. && LARVA_SYSCALL_LOG=/tmp/syscalls.txt cargo run --bin larva-run -- ./test
 cat /tmp/syscalls.txt
 ```
 
+## Alternative: Using Pre-built Static Binary
+
+If you can't build musl, you can download a pre-built static binary with debug symbols from musl.cc:
+
+```bash
+wget https://musl.cc/riscv64-linux-musl-cross.tgz
+tar xzf riscv64-linux-musl-cross.tgz
+./riscv64-linux-musl-cross/bin/riscv64-linux-musl-gcc -g -O0 -static hello-argv.c -o hello-argv.elf
+```
+
 ## License
 
 The build scripts and test programs are dedicated to the public domain (CC0).
