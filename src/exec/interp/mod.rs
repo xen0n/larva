@@ -806,7 +806,31 @@ impl<'a> RvInterpreterExecutor<'a> {
             }
             RvInsn::Sd(a) => {
                 let addr = (self.gx(a.rs1) as i64 + a.imm as i64) as u64;
-                self.set_u64(addr.into(), self.gx(a.rs2))
+                let val = self.gx(a.rs2);
+                let gaddr: GuestAddr = addr.into();
+                
+                // Debug: trace problematic stores
+                if addr >= 0x7f00000ffd00 && addr <= 0x7f0000100000 {
+                    eprintln!("  [Sd] pc={:016x} rs1={} imm={} addr={:016x} val={:016x}",
+                        self.state.get_pc(), a.rs1, a.imm, addr, val);
+                    
+                    // Check MMU translation
+                    if let Some(haddr) = self.mmu.g2h(gaddr) {
+                        eprintln!("  [Sd] g2h: {:016x} -> {:016x}", addr, haddr.as_u64());
+                        unsafe {
+                            let ptr = haddr.as_mut_ptr::<u64>();
+                            let before = ptr.read_volatile();
+                            eprintln!("  [Sd] before write: *{:p} = 0x{:016x}", ptr, before);
+                            ptr.write_volatile(val);
+                            let after = ptr.read_volatile();
+                            eprintln!("  [Sd] after write: *{:p} = 0x{:016x}", ptr, after);
+                        }
+                    } else {
+                        eprintln!("  [Sd] g2h FAILED for {:016x}", addr);
+                    }
+                }
+                
+                self.set_u64(gaddr, val)
                     .err()
                     .unwrap_or(StopReason::Next)
             }

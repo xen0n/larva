@@ -226,7 +226,8 @@ pub(super) fn disas_i(insn: u32) -> ISBTypeSlots {
 }
 
 pub(super) fn disas_s(insn: u32) -> ISBTypeSlots {
-    let imm = (insn >> (25 - 5)) | ((insn >> 7) & 0b11111);
+    // S-type immediate: imm[11:5] from insn[31:25], imm[4:0] from insn[11:7]
+    let imm = ((insn >> 25) & 0b1111111) << 5 | ((insn >> 7) & 0b11111);
     let imm = simm_from_uimm(imm, 12);
     let rs2 = ((insn >> 20) & 0b11111) as u8;
     let rs1 = ((insn >> 15) & 0b11111) as u8;
