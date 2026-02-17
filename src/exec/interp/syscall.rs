@@ -28,10 +28,13 @@ impl<'a> RvInterpreterExecutor<'a> {
         match nr {
             64 => self.do_sys_write(arg0, arg1, arg2),
             66 => self.do_sys_writev(arg0, arg1, arg2),
-            96 => self.do_sys_set_tid_address(arg1),
-            214 => self.do_sys_brk(arg0),
-            // exit_group
+            79 => self.do_sys_newfstatat(arg0, arg1, arg2, arg3),
             93 => self.do_sys_exit_group(arg0),
+            96 => self.do_sys_set_tid_address(arg1),
+            160 => self.do_sys_uname(arg0),
+            214 => self.do_sys_brk(arg0),
+            226 => self.do_sys_mprotect(arg0, arg1, arg2),
+            278 => self.do_sys_getrandom(arg0, arg1, arg2),
 
             _ => {
                 println!(
@@ -156,6 +159,110 @@ impl<'a> RvInterpreterExecutor<'a> {
         };
 
         self.sx(10, ret);
+        StopReason::Next
+    }
+
+    fn do_sys_uname(&mut self, buf_gaddr: u64) -> StopReason {
+        // Translate guest buffer address
+        let buf_haddr = match self.mmu.g2h(GuestAddr(buf_gaddr)) {
+            Some(addr) => addr.as_mut_ptr::<u8>(),
+            None => {
+                return StopReason::Segv {
+                    read: false,
+                    gaddr: buf_gaddr,
+                };
+            }
+        };
+
+        // struct utsname is 390 bytes on Linux (6 fields of 65 bytes each)
+        // sysname, nodename, release, version, machine, domainname
+        const UTSNAME_LEN: usize = 65;
+        const UTSNAME_SIZE: usize = UTSNAME_LEN * 6;
+
+        unsafe {
+            // Zero the buffer first
+            std::ptr::write_bytes(buf_haddr, 0, UTSNAME_SIZE);
+
+            // Fill in the fields
+            let sysname = b"Linux\0";
+            let nodename = b"larva\0";
+            let release = b"5.15.0\0";
+            let version = b"#1 LARVa\0";
+            let machine = b"riscv64\0";
+            let domainname = b"\0";
+
+            std::ptr::copy_nonoverlapping(sysname.as_ptr(), buf_haddr, sysname.len());
+            std::ptr::copy_nonoverlapping(nodename.as_ptr(), buf_haddr.add(UTSNAME_LEN), nodename.len());
+            std::ptr::copy_nonoverlapping(release.as_ptr(), buf_haddr.add(UTSNAME_LEN * 2), release.len());
+            std::ptr::copy_nonoverlapping(version.as_ptr(), buf_haddr.add(UTSNAME_LEN * 3), version.len());
+            std::ptr::copy_nonoverlapping(machine.as_ptr(), buf_haddr.add(UTSNAME_LEN * 4), machine.len());
+            std::ptr::copy_nonoverlapping(domainname.as_ptr(), buf_haddr.add(UTSNAME_LEN * 5), domainname.len());
+        }
+
+        self.sx(10, 0); // Success
+        StopReason::Next
+    }
+
+    fn do_sys_getrandom(&mut self, buf_gaddr: u64, buflen: u64, _flags: u64) -> StopReason {
+        // Translate guest buffer address
+        let buf_haddr = match self.mmu.g2h(GuestAddr(buf_gaddr)) {
+            Some(addr) => addr.as_mut_ptr::<u8>(),
+            None => {
+                return StopReason::Segv {
+                    read: false,
+                    gaddr: buf_gaddr,
+                };
+            }
+        };
+
+        // Fill with pseudo-random data (zeros for now - musl just needs this to not fail)
+        let len = buflen as usize;
+        unsafe {
+            std::ptr::write_bytes(buf_haddr, 0x42, len);
+        }
+
+        self.sx(10, buflen); // Return number of bytes written
+        StopReason::Next
+    }
+
+    fn do_sys_mprotect(&mut self, addr: u64, len: u64, prot: u64) -> StopReason {
+        // For now, just pretend it worked
+        // In a real implementation, we'd update the MMU permissions
+        // prot bits: PROT_READ=1, PROT_WRITE=2, PROT_EXEC=4
+        let _ = (addr, len, prot);
+        self.sx(10, 0); // Success
+        StopReason::Next
+    }
+
+    fn do_sys_newfstatat(&mut self, dirfd: u64, pathname_gaddr: u64, statbuf_gaddr: u64, flags: u64) -> StopReason {
+        // Translate pathname
+        let pathname_haddr = match self.mmu.g2h(GuestAddr(pathname_gaddr)) {
+            Some(addr) => addr.as_ptr::<u8>(),
+            None => {
+                return StopReason::Segv {
+                    read: true,
+                    gaddr: pathname_gaddr,
+                };
+            }
+        };
+
+        // Get pathname as string
+        let pathname = unsafe {
+            let len = libc::strlen(pathname_haddr as *const libc::c_char);
+            std::slice::from_raw_parts(pathname_haddr, len)
+        };
+        let pathname_str = String::from_utf8_lossy(pathname);
+
+        // For /etc/busybox.conf, return ENOENT (file not found)
+        // This is expected behavior - busybox probes for config file
+        if pathname_str == "/etc/busybox.conf" {
+            self.sx(10, u64::wrapping_neg(2)); // -ENOENT
+            return StopReason::Next;
+        }
+
+        // For other files, return ENOSYS for now
+        let _ = (dirfd, statbuf_gaddr, flags);
+        self.sx(10, u64::wrapping_neg(38)); // -ENOSYS
         StopReason::Next
     }
 }
