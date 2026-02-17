@@ -143,15 +143,13 @@ fn setup_stack(
 
         // Fill AT_RANDOM bytes with actual random data for stack canary
         let random_ptr = base_ptr.add(random_offset) as *mut u64;
-        unsafe {
-            // Use current time as simple random source
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_nanos() as u64;
-            random_ptr.write(now);
-            random_ptr.add(1).write(now.wrapping_mul(0x9e3779b97f4a7c15));
-        }
+        // Use current time as simple random source
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        random_ptr.write(now);
+        random_ptr.add(1).write(now.wrapping_mul(0x9e3779b97f4a7c15));
     }
 
     sp_new
