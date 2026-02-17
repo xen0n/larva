@@ -452,9 +452,34 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let type_idx = buf_offset / 8;
                 eprintln!("  [COPY] sp={:016x} store@={:016x} buffer[{}] = 0x{:016x}", 
                     x2, store_addr, type_idx, a3);
-                // Also show what's at the store address BEFORE the store (old value)
-                if let Ok(old_val) = self.get_u64((store_addr).into()) {
-                    eprintln!("         (old value at store@ was: 0x{:016x})", old_val);
+                // Verify the store actually happened by reading back
+                if let Ok(written) = self.get_u64((store_addr).into()) {
+                    if written == a3 {
+                        eprintln!("  [VERIFY] Store OK: 0x{:016x}", written);
+                    } else {
+                        eprintln!("  [VERIFY] Store MISMATCH: wrote 0x{:016x} but read 0x{:016x}!!", a3, written);
+                        // Check what's at the address as 32-bit words
+                        let lo = (written & 0xFFFFFFFF) as u32;
+                        let hi = ((written >> 32) & 0xFFFFFFFF) as u32;
+                        eprintln!("         As u32: lo=0x{:08x} hi=0x{:08x}", lo, hi);
+                    }
+                } else {
+                    eprintln!("  [VERIFY] Store FAILED: cannot read back from 0x{:016x}", store_addr);
+                }
+            }
+            
+            // After the store instruction executes, verify
+            if pc == 0x10376 {
+                // Check what was stored at the previous instruction's target
+                // We need to re-calculate the address
+                let a5 = self.gx(15); // a5 hasn't changed yet
+                let store_addr = a5.wrapping_sub(304);
+                let a3 = self.gx(13); // a3 still has the value
+                if let Ok(written) = self.get_u64((store_addr).into()) {
+                    if written != a3 {
+                        eprintln!("  [POST-STORE] FAILED: addr=0x{:016x} expected=0x{:016x} got=0x{:016x}",
+                            store_addr, a3, written);
+                    }
                 }
             }
             if pc >= 0x102a0 && pc <= 0x10380 {
