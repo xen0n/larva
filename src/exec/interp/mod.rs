@@ -408,21 +408,18 @@ impl<'a> RvInterpreterExecutor<'a> {
                 }
             }
             // Check x10 (a0) buffer - auxv buffer in __init_tls
-            if pc >= 0x11bb0 && pc <= 0x11d00 {
-                // Read first 304 bytes of buffer to see layout (musl uses up to type 37)
-                eprintln!("  [auxvbuf@{:016x}]:", x10);
-                for off in (0..304).step_by(32) {
-                    eprint!("  [{:3}]: ", off);
-                    for j in 0..4 {
-                        let addr = x10 + off + j * 8;
-                        if let Ok(val) = self.get_u64((addr).into()) {
-                            eprint!("{:016x} ", val);
-                        } else {
-                            eprint!("???????????????? ");
-                        }
+            if pc == 0x11bb0 {
+                // Entry to __init_tls - check what buffer was passed in a0
+                let a0 = self.gx(10);
+                eprintln!("  [__init_tls ENTRY] a0(buf)={:016x} sp={:016x}", a0, x2);
+                // Show what's at a0 (the passed buffer)
+                eprint!("  [a0 buffer]: ");
+                for off in (0..80).step_by(8) {
+                    if let Ok(val) = self.get_u64((a0 + off).into()) {
+                        eprint!("{:016x} ", val);
                     }
-                    eprintln!();
                 }
+                eprintln!();
             }
             
             // Trace __init_libc auxv copy loop (PC 0x102a6 area)
@@ -453,8 +450,12 @@ impl<'a> RvInterpreterExecutor<'a> {
                 let store_addr = a5.wrapping_sub(304);
                 let buf_offset = store_addr.wrapping_sub(x2 + 48);
                 let type_idx = buf_offset / 8;
-                eprintln!("  [COPY] a5={:016x} store@={:016x} buf_offset={} buffer[{}] = 0x{:016x}", 
-                    a5, store_addr, buf_offset, type_idx, a3);
+                eprintln!("  [COPY] sp={:016x} store@={:016x} buffer[{}] = 0x{:016x}", 
+                    x2, store_addr, type_idx, a3);
+                // Also show what's at the store address BEFORE the store (old value)
+                if let Ok(old_val) = self.get_u64((store_addr).into()) {
+                    eprintln!("         (old value at store@ was: 0x{:016x})", old_val);
+                }
             }
             if pc >= 0x102a0 && pc <= 0x10380 {
                 // Dump stack auxv at a0
