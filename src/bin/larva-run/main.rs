@@ -177,9 +177,72 @@ fn main() {
     state.set_x(8, sp.as_u64()); // x8 = s0/fp - initialize frame pointer to stack
 
     // Allocate and set up thread-local storage (required by musl)
-    let tls_size = 0x1000;
-    let tls_addr = mmu.mmap(tls_size, MemPerms::rw(), false).expect("failed to allocate TLS");
-    state.set_x(4, tls_addr.as_u64()); // x4 = tp (thread pointer)
+    // musl on RISC-V uses TLS_ABOVE_TP: pthread struct is BELOW the TP register
+    // TP points to end of pthread struct
+    let tls_size = 0x2000; // 8KB for TLS area
+    let tls_base = mmu.mmap(tls_size, MemPerms::rw(), false).expect("failed to allocate TLS");
+    
+    // Set up minimal pthread structure for musl
+    // pthread struct is approximately 200-300 bytes, place it at end of TLS area
+    let pthread_size = 0x200; // 512 bytes for pthread struct
+    let pthread_addr = tls_base.as_u64() + tls_size as u64 - pthread_size;
+    
+    // Initialize pthread struct fields in guest memory
+    if let Some(haddr) = mmu.g2h(GuestAddr(pthread_addr)) {
+        let pthread_ptr = haddr.as_mut_ptr::<u64>();
+        unsafe {
+            // Field 0: self = pointer to itself
+            pthread_ptr.write(pthread_addr);
+            // Field 1: prev = self (circular list)
+            pthread_ptr.add(1).write(pthread_addr);
+            // Field 2: next = self (circular list)
+            pthread_ptr.add(2).write(pthread_addr);
+            // Field 3: sysinfo = 0
+            pthread_ptr.add(3).write(0);
+            // Field 4: tid = 1 (main thread)
+            pthread_ptr.add(4).write(1);
+            // More fields zeroed by default from mmap
+        }
+    }
+    
+    // TP points to end of pthread struct (musl convention with TLS_ABOVE_TP)
+    let tp = pthread_addr + pthread_size;
+    state.set_x(4, tp); // x4 = tp (thread pointer)
+    
+    // Also allocate and set up a fake __libc structure that musl accesses via x8-112
+    // The crash happens because musl tries to load a pointer from x8-112,
+    // then access fields within __libc. We need to pre-initialize this.
+    let libc_size = 0x100; // 256 bytes for __libc structure
+    let libc_area = mmu.mmap(libc_size, MemPerms::rw(), false).expect("failed to allocate libc area");
+    
+    // Initialize __libc structure fields
+    if let Some(haddr) = mmu.g2h(libc_area) {
+        let libc_ptr = haddr.as_mut_ptr::<u64>();
+        unsafe {
+            // __libc.can_do_threads = 1 (offset 0)
+            libc_ptr.write(1);
+            // __libc.threaded = 0 (offset 1)
+            libc_ptr.add(1).write(0);
+            // __libc.secure = 0 (offset 2)  
+            libc_ptr.add(2).write(0);
+            // __libc.need_locks = 0 (offset 3)
+            libc_ptr.add(3).write(0);
+            // __libc.threads_minus_1 = 0 (offset 4)
+            libc_ptr.add(4).write(0);
+            // __libc.page_size = 4096 (offset ~56)
+            (libc_ptr.add(7) as *mut u64).write(4096);
+        }
+    }
+    
+    // Store pointer to __libc at x8-112 location (we'll set x8 to sp + 112)
+    // Actually, musl expects x8 to point to a location where x8-112 contains the __libc pointer
+    // Let's set up a structure on the stack for this
+    let stack_haddr = mmu.g2h(sp).expect("stack not mapped");
+    unsafe {
+        // At sp+112, store pointer to __libc area
+        let libc_ptr_location = (stack_haddr.as_mut_ptr::<u64>()).add(14); // sp + 14*8 = sp + 112
+        libc_ptr_location.write(libc_area.as_u64());
+    }
 
     // Create interpreter
     let mut executor = interp::RvInterpreterExecutor::new(64, &mut state, &mut mmu);
