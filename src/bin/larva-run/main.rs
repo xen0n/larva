@@ -182,7 +182,11 @@ fn main() {
 
     // Create interpreter
     let mut executor = interp::RvInterpreterExecutor::new(64, &mut state, &mut mmu);
-    // executor.debug(true);
+    
+    // Enable debug mode if LARVA_DEBUG is set
+    if std::env::var("LARVA_DEBUG").is_ok() {
+        executor.debug(true);
+    }
 
     // Run the program
     match executor.exec(elf_info.entry.as_u64()) {

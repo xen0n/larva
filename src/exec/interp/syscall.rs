@@ -25,7 +25,11 @@ impl<'a> RvInterpreterExecutor<'a> {
                 "syscall: {nr} ({arg0:#x}, {arg1:#x}, {arg2:#x}, {arg3:#x}, {arg4:#x}, {arg5:#x})"
             );
         }
-        match nr {
+
+        // Log syscall to file if LARVA_SYSCALL_LOG is set
+        let syscall_log_file = std::env::var("LARVA_SYSCALL_LOG").ok();
+
+        let result = match nr {
             64 => self.do_sys_write(arg0, arg1, arg2),
             66 => self.do_sys_writev(arg0, arg1, arg2),
             79 => self.do_sys_newfstatat(arg0, arg1, arg2, arg3),
@@ -43,7 +47,23 @@ impl<'a> RvInterpreterExecutor<'a> {
                 self.state.set_x(10, u64::wrapping_neg(38)); // -ENOSYS
                 StopReason::Next
             }
+        };
+
+        // Log syscall result if logging is enabled
+        if let Some(path) = syscall_log_file {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+                let ret = self.state.get_x(10);
+                let ret_str = if ret >= u64::MAX - 4096 {
+                    format!("-{}", u64::MAX - ret + 1)
+                } else {
+                    format!("{ret}")
+                };
+                let _ = writeln!(file, "{nr}({arg0:#x},{arg1:#x},{arg2:#x},{arg3:#x},{arg4:#x},{arg5:#x}) = {ret_str}");
+            }
         }
+
+        result
     }
 
     fn do_sys_exit_group(&mut self, exitcode: u64) -> ! {

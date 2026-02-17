@@ -310,8 +310,24 @@ impl<'a> RvInterpreterExecutor<'a> {
     pub fn exec(&mut self, entry_pc: u64) -> Option<StopReason> {
         self.state.set_pc(entry_pc);
 
+        // Open trace log file if LARVA_TRACE is set
+        let mut trace_file: Option<std::fs::File> = std::env::var("LARVA_TRACE")
+            .ok()
+            .and_then(|path| {
+                eprintln!("Tracing execution to: {path}");
+                std::fs::File::create(&path).ok()
+            });
+
         loop {
+            let pc = self.state.get_pc();
             let x = self.exec_one();
+
+            // Log to trace file if enabled
+            if let Some(file) = &mut trace_file {
+                use std::io::Write;
+                let _ = writeln!(file, "pc={:016x}", pc);
+            }
+
             match x {
                 StopReason::Next | StopReason::ContinueAt(_) => {}
                 _ => return Some(x),
@@ -340,12 +356,50 @@ impl<'a> RvInterpreterExecutor<'a> {
     }
 
     fn exec_one(&mut self) -> StopReason {
+        let pc = self.state.get_pc();
         let (insn, len) = match self.fetch_insn() {
             Ok((insn, len)) => (insn, len),
             Err(e) => return e,
         };
         if self.debug {
             println!("decoded {len}b: {insn:?}");
+        }
+
+        // Track when x8 or x9 changes
+        static mut LAST_X8: u64 = 0;
+        static mut LAST_X9: u64 = 0;
+        let x8_current = self.gx(8);
+        let x9_current = self.gx(9);
+        unsafe {
+            let last_x8 = LAST_X8;
+            let last_x9 = LAST_X9;
+            if x8_current != last_x8 {
+                println!("  [x8-change] pc={pc:016x} x8={x8_current:016x} (was {:016x})", last_x8);
+                LAST_X8 = x8_current;
+            }
+            if x9_current != last_x9 {
+                println!("  [x9-change] pc={pc:016x} x9={x9_current:016x} (was {:016x})", last_x9);
+                LAST_X9 = x9_current;
+            }
+        }
+
+        // Detailed trace for crash site region
+        if pc >= 0x1216f0 && pc <= 0x121710 {
+            let x2 = self.gx(2);
+            let x8 = self.gx(8);
+            let x9 = self.gx(9);
+            let x10 = self.gx(10);
+            let x14 = self.gx(14);
+            let x15 = self.gx(15);
+            println!("  [regs] x2(sp)={x2:016x} x8={x8:016x} x9={x9:016x} x10={x10:016x} x14={x14:016x} x15={x15:016x}");
+            
+            // Read stack values
+            if let Ok(val) = self.get_u64((x2 + 24).into()) {
+                println!("  [stack] sp+24={val:016x} (saved x8)");
+            }
+            if let Ok(val) = self.get_u64((x2 + 40).into()) {
+                println!("  [stack] sp+40={val:016x} (saved ra)");
+            }
         }
 
         let res = self.interpret_one(&insn, len);
